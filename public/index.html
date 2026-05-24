@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>86研究所 | 仮想オフィス</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div id="app" class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <img src="/assets/images/brand-icon.png" alt="" class="brand__icon">
+          <div>
+            <p class="brand__eyebrow">Virtual Office</p>
+            <h1>86研究所</h1>
+          </div>
+        </div>
+        <div class="topbar__center">
+          <span id="todayLabel"></span>
+          <span class="live-dot"></span>
+          <span>ライブ</span>
+        </div>
+        <div class="topbar__actions">
+          <button class="ghost-button" id="qrButton" type="button">入退室QR</button>
+          <button class="primary-button primary-button--remote" id="remoteButton" type="button">リモートで入る</button>
+          <label class="user-switcher" aria-label="操作対象メンバー">
+            <img id="currentUserAvatar" src="/assets/avatars/taniguchi-kyoshiro.png" alt="">
+            <span>操作ユーザー</span>
+            <select id="memberSelect"></select>
+          </label>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar" aria-label="メインナビゲーション">
+          <button class="nav-item is-active" data-view-button="office" type="button">オフィス</button>
+          <button class="nav-item" data-view-button="history" type="button">履歴</button>
+          <button class="nav-item" data-view-button="members" type="button">メンバー</button>
+          <button class="nav-item" data-view-button="settings" type="button">設定</button>
+          <div class="sidebar__mini">
+            <img src="/assets/images/office-room.png" alt="">
+            <strong>大阪オフィス 6F</strong>
+            <span id="miniStatus"></span>
+          </div>
+        </aside>
+
+        <main class="content">
+          <section class="view is-visible" id="officeView" aria-labelledby="officeTitle">
+            <div class="page-title">
+              <div>
+                <p class="section-kicker">Presence Board</p>
+                <h2 id="officeTitle">現在の在籍状況</h2>
+              </div>
+              <div class="segmented" role="group" aria-label="入室操作">
+                <button id="officeButton" type="button">QRでオフィス入室</button>
+                <button id="checkoutButton" type="button">退室する</button>
+              </div>
+            </div>
+
+            <section class="operator-panel" aria-label="操作対象メンバーの状態">
+              <img id="operatorAvatar" src="/assets/avatars/taniguchi-kyoshiro.png" alt="">
+              <div>
+                <p class="section-kicker">Selected Member</p>
+                <h3 id="operatorName">谷口強志郎</h3>
+                <p id="operatorStatus">リモート・在籍中</p>
+              </div>
+              <div class="status-actions" role="group" aria-label="ステータス更新">
+                <button data-status-button="active" type="button">作業中</button>
+                <button data-status-button="away" type="button">離席</button>
+                <button data-status-button="meeting" type="button">会議中</button>
+              </div>
+            </section>
+
+            <div class="summary-grid" id="summaryGrid"></div>
+
+            <div class="office-grid">
+              <section class="scene-panel" aria-label="仮想オフィスマップ">
+                <div class="scene-panel__head">
+                  <div>
+                    <p class="section-kicker">Osaka Office 6F</p>
+                    <h3>オフィス勤務エリア</h3>
+                  </div>
+                  <span class="mode-pill mode-pill--office">QR認証</span>
+                </div>
+                <div class="scene-scroll">
+                  <div class="scene-stage">
+                    <img src="/assets/images/office-room.png" alt="86研究所のドット絵オフィス" class="office-room">
+                    <div class="scene-callout" aria-hidden="true">
+                      <strong>86研究所</strong>
+                      <span>オフィス勤務ライブ</span>
+                    </div>
+                    <div id="officePins" class="office-pins"></div>
+                  </div>
+                </div>
+              </section>
+
+              <aside class="presence-panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Now</p>
+                    <h3>メンバー</h3>
+                  </div>
+                  <strong id="presenceCount"></strong>
+                </div>
+                <div id="presenceList" class="presence-list"></div>
+              </aside>
+            </div>
+
+            <section class="remote-panel" aria-label="リモート勤務エリア">
+              <div class="panel-head">
+                <div>
+                  <p class="section-kicker">Remote Lobby</p>
+                  <h3>リモート勤務エリア</h3>
+                </div>
+                <span class="mode-pill mode-pill--remote">自己申告</span>
+              </div>
+              <div class="remote-grid" id="remoteGrid"></div>
+            </section>
+
+            <div class="lower-grid">
+              <section class="timeline-panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">Timeline</p>
+                    <h3>今日のタイムライン</h3>
+                  </div>
+                </div>
+                <div class="timeline" id="timeline"></div>
+              </section>
+
+              <section class="history-panel">
+                <div class="panel-head">
+                  <div>
+                    <p class="section-kicker">History</p>
+                    <h3>出退室履歴</h3>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>メンバー</th>
+                        <th>区分</th>
+                        <th>開始</th>
+                        <th>終了</th>
+                        <th>状態</th>
+                      </tr>
+                    </thead>
+                    <tbody id="historyRows"></tbody>
+                  </table>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="view" id="historyView" aria-labelledby="historyTitle">
+            <div class="page-title">
+              <div>
+                <p class="section-kicker">History</p>
+                <h2 id="historyTitle">出勤履歴とオフィス利用分析</h2>
+              </div>
+            </div>
+            <div class="analytics-grid">
+              <section class="chart-panel">
+                <h3>日別チェックイン</h3>
+                <div class="bar-chart" id="barChart"></div>
+              </section>
+              <section class="chart-panel">
+                <h3>区分別の在籍</h3>
+                <div class="donut">
+                  <span id="donutLabel"></span>
+                </div>
+              </section>
+            </div>
+            <div class="history-panel">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>日付</th>
+                      <th>メンバー</th>
+                      <th>区分</th>
+                      <th>開始</th>
+                      <th>終了</th>
+                      <th>メモ</th>
+                    </tr>
+                  </thead>
+                  <tbody id="historyRowsFull"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="view" id="membersView" aria-labelledby="membersTitle">
+            <div class="page-title">
+              <div>
+                <p class="section-kicker">Members</p>
+                <h2 id="membersTitle">メンバー一覧</h2>
+              </div>
+            </div>
+            <div class="member-grid" id="memberGrid"></div>
+          </section>
+
+          <section class="view" id="settingsView" aria-labelledby="settingsTitle">
+            <div class="page-title">
+              <div>
+                <p class="section-kicker">Settings</p>
+                <h2 id="settingsTitle">MVP設定</h2>
+              </div>
+            </div>
+            <div class="settings-panel">
+              <dl>
+                <div>
+                  <dt>オフィス名</dt>
+                  <dd>86研究所</dd>
+                </div>
+                <div>
+                  <dt>QRトークン</dt>
+                  <dd>86-lab-office-main</dd>
+                </div>
+                <div>
+                  <dt>リモート入室</dt>
+                  <dd>ログイン済みユーザーの自己申告として記録</dd>
+                </div>
+                <div>
+                  <dt>データ保存</dt>
+                  <dd id="dataSourceLabel">ローカルJSON DB</dd>
+                </div>
+                <div>
+                  <dt>本番DB</dt>
+                  <dd>環境変数がある場合はSupabase REST/RPCへ接続</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      <nav class="bottom-nav" aria-label="モバイルナビゲーション">
+        <button class="is-active" data-view-button="office" type="button">オフィス</button>
+        <button data-view-button="history" type="button">履歴</button>
+        <button data-view-button="members" type="button">メンバー</button>
+      </nav>
+    </div>
+
+    <dialog id="qrDialog" class="qr-dialog">
+      <div class="qr-dialog__head">
+        <div>
+          <p class="section-kicker">Office QR</p>
+          <h3>86研究所 入退室QR</h3>
+        </div>
+        <button class="icon-button" id="closeQrButton" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="qr-preview" aria-hidden="true">
+        <div class="qr-grid"></div>
+      </div>
+      <p class="qr-dialog__url">/scan/86-lab-office-main</p>
+      <div class="qr-user-line">
+        <img id="qrUserAvatar" src="/assets/avatars/taniguchi-kyoshiro.png" alt="">
+        <div>
+          <span>このメンバーでQR入室</span>
+          <strong id="qrUserName">谷口強志郎</strong>
+        </div>
+      </div>
+      <button class="primary-button" id="dialogOfficeButton" type="button">QRでオフィス入室</button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

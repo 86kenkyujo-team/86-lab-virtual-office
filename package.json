@@ -1,0 +1,11 @@
+{
+  "name": "86-lab-virtual-office",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-vercel.mjs",
+    "dev": "node server.mjs",
+    "start": "node server.mjs"
+  }
+}
