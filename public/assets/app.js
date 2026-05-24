@@ -334,9 +334,12 @@ function renderCurrentUserActions() {
 }
 
 function renderSettings() {
-  const label = state.db.dataSource === "supabase"
-    ? "Supabase Postgres"
-    : "ローカルJSON DB";
+  const dataSourceLabels = {
+    supabase: "Supabase Postgres",
+    "vercel-json": "Vercel JSON Demo",
+    json: "ローカルJSON DB"
+  };
+  const label = dataSourceLabels[state.db.dataSource] || "ローカルJSON DB";
   $("#dataSourceLabel").textContent = label;
 }
 
