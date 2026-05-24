@@ -1,7 +1,6 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const dbPath = path.join(process.cwd(), "data", "presence-db.json");
 const memberOrder = [
   "hachiro-motoki",
   "marubayashi-yuto",
@@ -31,16 +30,82 @@ async function loadEnvFile(filePath) {
 await loadEnvFile(path.join(process.cwd(), ".env"));
 await loadEnvFile(path.join(process.cwd(), ".env.local"));
 
+const dbPath = path.resolve(process.env.PRESENCE_DB_PATH || path.join(process.cwd(), "data", "presence-db.json"));
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-const dataSource = supabaseUrl && supabaseServiceKey ? "supabase" : "json";
+const forceJsonStore = process.env.PRESENCE_DB_FORCE_JSON === "1";
+const dataSource = !forceJsonStore && supabaseUrl && supabaseServiceKey ? "supabase" : "json";
+const isVercel = Boolean(process.env.VERCEL);
+const missingSupabaseEnv = [
+  ["SUPABASE_URL", supabaseUrl],
+  ["SUPABASE_SERVICE_ROLE_KEY", supabaseServiceKey]
+].filter(([, value]) => !value).map(([key]) => key);
+const fallbackOffice = {
+  id: "86-lab-osaka",
+  name: "86研究所",
+  location: "大阪オフィス 6F",
+  qrToken: "86-lab-office-main"
+};
+
+function localDataSource() {
+  return isVercel ? "vercel-json" : "json";
+}
+
+function sourceMetadata(source) {
+  const isSupabase = source === "supabase";
+  const isLocalJson = source === "json";
+  const writable = isSupabase || isLocalJson;
+
+  return {
+    dataSource: source,
+    persistence: {
+      persistent: writable,
+      writable,
+      requiresSupabase: source === "vercel-json",
+      missingEnv: source === "vercel-json" ? missingSupabaseEnv : [],
+      message: source === "vercel-json"
+        ? "VercelではSupabase環境変数が必要です。未設定のため更新は保存されません。"
+        : null
+    }
+  };
+}
 
 function nowIso() {
   return new Date().toISOString();
 }
 
 function withDataSource(db, source) {
-  return { ...db, dataSource: source };
+  return { ...db, ...sourceMetadata(source) };
+}
+
+function validateOfficeQrToken(expectedToken, providedToken) {
+  if (!providedToken) {
+    return {
+      ok: false,
+      error: "qr_token_required",
+      message: "QR入室には有効なオフィスQRが必要です。"
+    };
+  }
+
+  if (providedToken !== expectedToken) {
+    return {
+      ok: false,
+      error: "invalid_qr_token",
+      message: "このQRは86研究所の入室QRとして認証できません。"
+    };
+  }
+
+  return { ok: true };
+}
+
+function mapOffice(row) {
+  if (!row) return fallbackOffice;
+  return {
+    id: row.id,
+    name: row.name,
+    location: row.location,
+    qrToken: row.qr_token
+  };
 }
 
 async function readDb() {
@@ -59,7 +124,7 @@ async function writeDb(db) {
 
 async function readLocalState() {
   const db = await readDb();
-  return withDataSource(db, process.env.VERCEL ? "vercel-json" : "json");
+  return withDataSource(db, localDataSource());
 }
 
 async function supabaseRequest(route, options = {}) {
@@ -85,7 +150,13 @@ async function supabaseRequest(route, options = {}) {
 }
 
 function sortMembers(members) {
-  return members.slice().sort((a, b) => memberOrder.indexOf(a.id) - memberOrder.indexOf(b.id));
+  return members.slice().sort((a, b) => {
+    const aIndex = memberOrder.indexOf(a.id);
+    const bIndex = memberOrder.indexOf(b.id);
+    const safeA = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+    const safeB = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+    return safeA - safeB;
+  });
 }
 
 function mapProfile(row) {
@@ -148,20 +219,10 @@ async function readSupabaseState() {
     supabaseRequest("presence_events?select=*&order=created_at.desc&limit=50")
   ]);
 
-  const office = offices[0] || {
-    id: "86-lab-osaka",
-    name: "86研究所",
-    location: "大阪オフィス 6F",
-    qr_token: "86-lab-office-main"
-  };
+  const office = mapOffice(offices[0]);
 
   return withDataSource({
-    office: {
-      id: office.id,
-      name: office.name,
-      location: office.location,
-      qrToken: office.qr_token
-    },
+    office,
     members: sortMembers(profiles.map(mapProfile)),
     currentPresence: presences.map(mapPresence),
     sessions: sessions.map(mapSession),
@@ -174,10 +235,12 @@ export async function readState() {
 }
 
 export function getHealth() {
+  const source = dataSource === "supabase" ? "supabase" : localDataSource();
   return {
     ok: true,
-    dataSource,
-    supabaseConfigured: dataSource === "supabase"
+    ...sourceMetadata(source),
+    supabaseConfigured: dataSource === "supabase",
+    vercel: isVercel
   };
 }
 
@@ -237,13 +300,20 @@ async function updateSupabasePresence(payload) {
   }
 
   const workMode = payload.workMode === "office" ? "office" : "remote";
+  if (workMode === "office") {
+    const offices = await supabaseRequest("offices?select=id,name,location,qr_token&limit=1");
+    const qrCheck = validateOfficeQrToken(mapOffice(offices[0]).qrToken, payload.qrToken);
+    if (!qrCheck.ok) return { ...qrCheck, state: await readSupabaseState() };
+  }
+
   await supabaseRequest("rpc/check_in_presence", {
     method: "POST",
     body: {
       p_user_id: payload.userId,
       p_work_mode: workMode,
       p_status: payload.status || "active",
-      p_entry_method: payload.entryMethod || (workMode === "office" ? "office_qr" : "remote_manual")
+      p_entry_method: payload.entryMethod || (workMode === "office" ? "office_qr" : "remote_manual"),
+      p_qr_token: workMode === "office" ? payload.qrToken : null
     }
   });
   return { ok: true, state: await readSupabaseState() };
@@ -265,7 +335,7 @@ async function updateJsonPresence(payload) {
     db.currentPresence = db.currentPresence.filter((presence) => presence.userId !== user.id);
     db.events.unshift(createEvent(user, existing?.workMode || payload.workMode || "office", "checkout"));
     await writeDb(db);
-    return { ok: true, state: withDataSource(db, process.env.VERCEL ? "vercel-json" : "json") };
+    return { ok: true, state: withDataSource(db, localDataSource()) };
   }
 
   if (payload.action === "status") {
@@ -295,12 +365,17 @@ async function updateJsonPresence(payload) {
     });
     db.events.unshift(createEvent(user, existing.workMode, nextStatus));
     await writeDb(db);
-    return { ok: true, state: withDataSource(db, process.env.VERCEL ? "vercel-json" : "json") };
+    return { ok: true, state: withDataSource(db, localDataSource()) };
   }
 
   const workMode = payload.workMode === "office" ? "office" : "remote";
   const status = payload.status || "active";
   const entryMethod = payload.entryMethod || (workMode === "office" ? "office_qr" : "remote_manual");
+  if (workMode === "office") {
+    const qrCheck = validateOfficeQrToken(db.office.qrToken, payload.qrToken);
+    if (!qrCheck.ok) return { ...qrCheck, state: withDataSource(db, localDataSource()) };
+  }
+
   const existing = db.currentPresence.find((presence) => presence.userId === user.id);
   const position = workMode === "office"
     ? existing?.position || { x: 47, y: 61 }
@@ -335,9 +410,22 @@ async function updateJsonPresence(payload) {
 
   db.events.unshift(createEvent(user, workMode, workMode === "office" ? "check_in" : "remote_in"));
   await writeDb(db);
-  return { ok: true, state: withDataSource(db, process.env.VERCEL ? "vercel-json" : "json") };
+  return { ok: true, state: withDataSource(db, localDataSource()) };
 }
 
 export async function updatePresence(payload) {
-  return dataSource === "supabase" ? updateSupabasePresence(payload) : updateJsonPresence(payload);
+  if (dataSource === "supabase") {
+    return updateSupabasePresence(payload);
+  }
+
+  if (isVercel) {
+    return {
+      ok: false,
+      error: "persistent_database_required",
+      message: "本番環境ではSupabase環境変数が必要です。SUPABASE_URL と SUPABASE_SERVICE_ROLE_KEY を設定してください。",
+      state: await readLocalState()
+    };
+  }
+
+  return updateJsonPresence(payload);
 }

@@ -29,7 +29,15 @@ export default async function handler(req, res) {
     return;
   }
 
-  const payload = await getBody(req);
-  const result = await updatePresence(payload);
-  res.status(result.ok ? 200 : 400).json(result);
+  try {
+    const payload = await getBody(req);
+    const result = await updatePresence(payload);
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: "presence_update_failed",
+      message: error.message
+    });
+  }
 }

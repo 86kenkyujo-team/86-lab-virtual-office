@@ -31,6 +31,17 @@ cp .env.example .env.local
 ```
 
 Supabaseを使う場合は、先に `supabase/schema.sql` をSQL Editorなどで実行してください。
+本番VercelではJSON DBへの書き込みは永続化されないため、Supabase未設定時の更新APIは読み取り専用として失敗します。詳しくは `docs/SUPABASE_PERSISTENCE.md` を参照してください。
+
+## 確認
+
+```bash
+npm test
+npm run build
+npm run check:supabase
+```
+
+`npm run check:supabase` は `.env.local` または環境変数の `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` を使ってSupabaseの読み取り疎通を確認します。
 
 ## MVPでできること
 
@@ -38,7 +49,7 @@ Supabaseを使う場合は、先に `supabase/schema.sql` をSQL Editorなどで
 - オフィス勤務とリモート勤務を分けて表示
 - メンバー6名の在籍状況を表示
 - 操作対象メンバーを切り替えて入退室を試せる
-- QR入室、リモート入室、退室をローカルDBへ記録
+- QRトークンを確認して、QR入室、リモート入室、退室を記録
 - 作業中、離席、会議中のステータス更新
 - 履歴とタイムラインを表示
 

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-vercel.mjs",
+    "check:supabase": "node scripts/check-supabase.mjs",
     "dev": "node server.mjs",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "test": "node scripts/smoke-test.mjs"
   }
 }

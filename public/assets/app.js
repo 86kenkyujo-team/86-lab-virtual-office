@@ -20,7 +20,8 @@ const labels = {
 };
 
 const state = {
-  db: null
+  db: null,
+  scanToken: null
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -92,6 +93,21 @@ function createStatusPill(presence) {
   return `<span class="status-pill ${statusClass(presence)}">${labels.workMode[presence.workMode]}・${labels.status[presence.status]}</span>`;
 }
 
+function pinMotionStyle(presence, index) {
+  const duration = {
+    active: "3.2s",
+    away: "5.4s",
+    meeting: "2.4s"
+  }[presence.status] || "3.6s";
+
+  return [
+    `--x:${presence.position?.x || 50}%`,
+    `--y:${presence.position?.y || 50}%`,
+    `--delay:${(-0.45 * index).toFixed(2)}s`,
+    `--duration:${duration}`
+  ].join(";");
+}
+
 function showToast(message) {
   const toast = $("#toast");
   toast.textContent = message;
@@ -101,10 +117,31 @@ function showToast(message) {
 
 async function loadState() {
   const response = await fetch("/api/state", { cache: "no-store" });
-  state.db = await response.json();
+  const result = await response.json();
+  if (!response.ok || result.ok === false) {
+    throw new Error(result.message || "状態を取得できませんでした");
+  }
+  state.db = result;
+}
+
+function scanTokenFromPath() {
+  const prefix = "/scan/";
+  if (!window.location.pathname.startsWith(prefix)) return null;
+  const token = window.location.pathname.slice(prefix.length).split("/")[0];
+  return token ? decodeURIComponent(token) : null;
 }
 
 async function updatePresence(payload, message) {
+  if (!state.db) {
+    showToast("読み込み中です");
+    return;
+  }
+
+  if (state.db.persistence?.writable === false) {
+    showToast(state.db.persistence.message || "本番DB未設定のため更新できません");
+    return;
+  }
+
   const response = await fetch("/api/presence", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -112,7 +149,11 @@ async function updatePresence(payload, message) {
   });
   const result = await response.json();
   if (!result.ok) {
-    showToast("更新できませんでした");
+    showToast(result.message || "更新できませんでした");
+    if (result.state) {
+      state.db = result.state;
+      render();
+    }
     return;
   }
   state.db = result.state;
@@ -150,7 +191,7 @@ function renderSummary() {
     { label: "オフィス", value: `${officeCount}人`, note: "QR入室済み" },
     { label: "リモート", value: `${remoteCount}人`, note: "アプリから入室" },
     { label: "在籍合計", value: `${presences.length}/${total}`, note: "ライブ更新" },
-    { label: "最初の入室", value: formatTime(firstCheckIn), note: "今日の開始時刻" }
+    { label: "最初の入室", value: formatTime(firstCheckIn), note: "表示中データの開始時刻" }
   ].map((item) => `
     <article class="summary-card">
       <span>${item.label}</span>
@@ -164,10 +205,11 @@ function renderSummary() {
 }
 
 function renderMemberSelector() {
-  const select = $("#memberSelect");
-  select.innerHTML = state.db.members.map((member) => `
+  const options = state.db.members.map((member) => `
     <option value="${member.id}" ${member.id === selectedUserId ? "selected" : ""}>${member.name}</option>
   `).join("");
+  $("#memberSelect").innerHTML = options;
+  $("#mobileMemberSelect").innerHTML = options;
 }
 
 function renderOperator() {
@@ -186,6 +228,7 @@ function renderOperator() {
   $("#qrUserAvatar").src = member.avatarUrl;
   $("#qrUserAvatar").alt = member.name;
   $("#qrUserName").textContent = member.name;
+  renderQrState();
 
   $$("[data-status-button]").forEach((button) => {
     button.classList.toggle("is-active", presence?.status === button.dataset.statusButton);
@@ -194,13 +237,39 @@ function renderOperator() {
   });
 }
 
+function renderQrState() {
+  if (!state.db) return;
+
+  const officeToken = state.db.office.qrToken;
+  const activeToken = state.scanToken || officeToken;
+  const isInvalidScan = Boolean(state.scanToken && state.scanToken !== officeToken);
+  const status = $("#qrStatus");
+  const button = $("#dialogOfficeButton");
+
+  $("#qrUrl").textContent = `/scan/${officeToken}`;
+  status.textContent = isInvalidScan
+    ? "このQRトークンは認証できません"
+    : state.scanToken
+      ? "QRトークン認証済み"
+      : "このQRでオフィス入室を記録します";
+  status.classList.toggle("is-error", isInvalidScan);
+  button.disabled = isInvalidScan || state.db.persistence?.writable === false;
+  button.style.opacity = button.disabled ? "0.48" : "1";
+  button.dataset.qrToken = activeToken;
+}
+
 function renderOfficePins() {
   const officePresences = activePresence().filter((presence) => presence.workMode === "office");
-  $("#officePins").innerHTML = officePresences.map((presence) => {
+  $("#officePins").innerHTML = officePresences.map((presence, index) => {
     const member = memberById(presence.userId);
+    const status = presence.status || "active";
     return `
-      <div class="pin" style="--x:${presence.position?.x || 50}%; --y:${presence.position?.y || 50}%">
-        <img class="pin__avatar" src="${member.avatarUrl}" alt="${member.name}">
+      <div class="pin pin--${status}" style="${pinMotionStyle(presence, index)}">
+        <span class="pin__person">
+          <span class="pin__shadow" aria-hidden="true"></span>
+          <img class="pin__avatar" src="${member.avatarUrl}" alt="${member.name}">
+          <span class="pin__status-dot" aria-hidden="true"></span>
+        </span>
         <div class="pin__label">
           ${member.name}
           <span>${labels.status[presence.status]} ${formatTime(presence.since)}〜</span>
@@ -339,7 +408,8 @@ function renderSettings() {
     "vercel-json": "Vercel JSON Demo",
     json: "ローカルJSON DB"
   };
-  const label = dataSourceLabels[state.db.dataSource] || "ローカルJSON DB";
+  const baseLabel = dataSourceLabels[state.db.dataSource] || "ローカルJSON DB";
+  const label = state.db.persistence?.writable === false ? `${baseLabel}（読み取り専用）` : baseLabel;
   $("#dataSourceLabel").textContent = label;
 }
 
@@ -379,6 +449,10 @@ function bindActions() {
     setSelectedUser(event.target.value);
   });
 
+  $("#mobileMemberSelect").addEventListener("change", (event) => {
+    setSelectedUser(event.target.value);
+  });
+
   $("#remoteButton").addEventListener("click", () => {
     updatePresence({
       workMode: "remote",
@@ -388,11 +462,8 @@ function bindActions() {
   });
 
   $("#officeButton").addEventListener("click", () => {
-    updatePresence({
-      workMode: "office",
-      status: "active",
-      entryMethod: "office_qr"
-    }, "オフィス勤務として入りました");
+    renderQrState();
+    $("#qrDialog").showModal();
   });
 
   $("#checkoutButton").addEventListener("click", () => {
@@ -411,21 +482,27 @@ function bindActions() {
     updatePresence({
       workMode: "office",
       status: "active",
-      entryMethod: "office_qr"
+      entryMethod: "office_qr",
+      qrToken: $("#dialogOfficeButton").dataset.qrToken
     }, "QRでオフィスに入りました");
   });
 
-  $("#qrButton").addEventListener("click", () => $("#qrDialog").showModal());
+  $("#qrButton").addEventListener("click", () => {
+    renderQrState();
+    $("#qrDialog").showModal();
+  });
   $("#closeQrButton").addEventListener("click", () => $("#qrDialog").close());
 }
 
 async function boot() {
+  state.scanToken = scanTokenFromPath();
   bindNavigation();
   bindActions();
   await loadState();
   render();
 
   if (window.location.pathname.startsWith("/scan/")) {
+    renderQrState();
     $("#qrDialog").showModal();
   }
 }

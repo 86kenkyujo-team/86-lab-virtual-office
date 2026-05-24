@@ -64,6 +64,10 @@
                 <p class="section-kicker">Selected Member</p>
                 <h3 id="operatorName">谷口強志郎</h3>
                 <p id="operatorStatus">リモート・在籍中</p>
+                <label class="operator-switcher" aria-label="操作対象メンバーを変更">
+                  <span>操作ユーザー</span>
+                  <select id="mobileMemberSelect"></select>
+                </label>
               </div>
               <div class="status-actions" role="group" aria-label="ステータス更新">
                 <button data-status-button="active" type="button">作業中</button>
@@ -123,7 +127,7 @@
                 <div class="panel-head">
                   <div>
                     <p class="section-kicker">Timeline</p>
-                    <h3>今日のタイムライン</h3>
+                    <h3>最新タイムライン</h3>
                   </div>
                 </div>
                 <div class="timeline" id="timeline"></div>
@@ -255,7 +259,8 @@
       <div class="qr-preview" aria-hidden="true">
         <div class="qr-grid"></div>
       </div>
-      <p class="qr-dialog__url">/scan/86-lab-office-main</p>
+      <p class="qr-dialog__url" id="qrUrl">/scan/86-lab-office-main</p>
+      <p class="qr-dialog__status" id="qrStatus">QRトークンを確認中</p>
       <div class="qr-user-line">
         <img id="qrUserAvatar" src="/assets/avatars/taniguchi-kyoshiro.png" alt="">
         <div>

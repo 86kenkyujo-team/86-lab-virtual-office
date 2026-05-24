@@ -117,11 +117,14 @@ on presence_events for select
 to authenticated
 using (true);
 
+drop function if exists check_in_presence(text, work_mode, presence_status, entry_method);
+
 create or replace function check_in_presence(
   p_user_id text,
   p_work_mode work_mode,
   p_status presence_status default 'active',
-  p_entry_method entry_method default null
+  p_entry_method entry_method default null,
+  p_qr_token text default null
 )
 returns jsonb
 language plpgsql
@@ -137,6 +140,7 @@ declare
   v_position_y numeric;
   v_mode_label text;
   v_event_type text;
+  v_expected_qr_token text;
 begin
   select *
   into v_profile
@@ -152,6 +156,18 @@ begin
     p_entry_method,
     case when p_work_mode = 'office' then 'office_qr'::entry_method else 'remote_manual'::entry_method end
   );
+
+  if p_work_mode = 'office' then
+    select qr_token
+    into v_expected_qr_token
+    from offices
+    where id = v_office_id;
+
+    if p_qr_token is null or p_qr_token <> v_expected_qr_token then
+      raise exception 'invalid office qr token'
+        using errcode = '22023';
+    end if;
+  end if;
 
   update attendance_sessions
   set checked_out_at = v_checked_at,
@@ -375,10 +391,10 @@ begin
 end;
 $$;
 
-revoke execute on function check_in_presence(text, work_mode, presence_status, entry_method) from anon, authenticated;
-revoke execute on function checkout_presence(text) from anon, authenticated;
-revoke execute on function update_presence_status(text, presence_status) from anon, authenticated;
-grant execute on function check_in_presence(text, work_mode, presence_status, entry_method) to service_role;
+revoke execute on function check_in_presence(text, work_mode, presence_status, entry_method, text) from public, anon, authenticated;
+revoke execute on function checkout_presence(text) from public, anon, authenticated;
+revoke execute on function update_presence_status(text, presence_status) from public, anon, authenticated;
+grant execute on function check_in_presence(text, work_mode, presence_status, entry_method, text) to service_role;
 grant execute on function checkout_presence(text) to service_role;
 grant execute on function update_presence_status(text, presence_status) to service_role;
 

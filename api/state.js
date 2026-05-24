@@ -6,5 +6,13 @@ export default async function handler(req, res) {
     return;
   }
 
-  res.status(200).json(await readState());
+  try {
+    res.status(200).json(await readState());
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: "state_read_failed",
+      message: error.message
+    });
+  }
 }
