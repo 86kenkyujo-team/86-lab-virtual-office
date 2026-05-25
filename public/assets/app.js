@@ -93,7 +93,7 @@ function createStatusPill(presence) {
   return `<span class="status-pill ${statusClass(presence)}">${labels.workMode[presence.workMode]}・${labels.status[presence.status]}</span>`;
 }
 
-function pinMotionStyle(presence, index) {
+function characterPositionStyle(presence, index) {
   const duration = {
     active: "3.2s",
     away: "5.4s",
@@ -106,6 +106,14 @@ function pinMotionStyle(presence, index) {
     `--delay:${(-0.45 * index).toFixed(2)}s`,
     `--duration:${duration}`
   ].join(";");
+}
+
+function characterStatusLabel(status) {
+  return {
+    active: "作業",
+    away: "離席",
+    meeting: "MTG"
+  }[status] || "作業";
 }
 
 function showToast(message) {
@@ -262,18 +270,45 @@ function renderOfficePins() {
   const officePresences = activePresence().filter((presence) => presence.workMode === "office");
   $("#officePins").innerHTML = officePresences.map((presence, index) => {
     const member = memberById(presence.userId);
+    if (!member) return "";
     const status = presence.status || "active";
+    const statusText = labels.status[status] || labels.status.active;
+    const seatText = presence.seatLabel || member.seatLabel || "座席未設定";
     return `
-      <div class="pin pin--${status}" style="${pinMotionStyle(presence, index)}">
-        <span class="pin__person">
-          <span class="pin__shadow" aria-hidden="true"></span>
-          <img class="pin__avatar" src="${member.avatarUrl}" alt="${member.name}">
-          <span class="pin__status-dot" aria-hidden="true"></span>
+      <div class="office-character office-character--${status}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${member.name}、${seatText}、${statusText}、${formatTime(presence.since)}から">
+        <span class="office-character__station" aria-hidden="true">
+          <span class="office-character__shadow"></span>
+          <span class="office-character__chair"></span>
+          <span class="office-character__body">
+            <span class="office-character__head">
+              <img class="office-character__face" src="${member.avatarUrl}" alt="">
+            </span>
+            <span class="office-character__torso"></span>
+            <span class="office-character__arm office-character__arm--left"></span>
+            <span class="office-character__arm office-character__arm--right"></span>
+          </span>
+          <span class="office-character__desk">
+            <span class="office-character__keyboard">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+          </span>
+          <span class="office-character__status-dot"></span>
+          <span class="office-character__status-badge">${characterStatusLabel(status)}</span>
+          <span class="office-character__meeting-bubble">
+            MTG
+            <span class="office-character__voice">
+              <i></i>
+              <i></i>
+              <i></i>
+            </span>
+          </span>
         </span>
-        <div class="pin__label">
-          ${member.name}
-          <span>${labels.status[presence.status]} ${formatTime(presence.since)}〜</span>
-        </div>
+        <span class="office-character__label">
+          <strong>${member.name}</strong>
+          <span>${statusText} ${formatTime(presence.since)}〜</span>
+        </span>
       </div>
     `;
   }).join("");
