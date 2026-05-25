@@ -21,11 +21,24 @@ const labels = {
 
 const state = {
   db: null,
+  assets: null,
   scanToken: null
 };
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+const layoutMedia = window.matchMedia("(max-width: 860px)");
+const htmlEntities = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;"
+};
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => htmlEntities[char]);
+}
 
 function toDate(value) {
   return value ? new Date(value) : null;
@@ -93,19 +106,54 @@ function createStatusPill(presence) {
   return `<span class="status-pill ${statusClass(presence)}">${labels.workMode[presence.workMode]}・${labels.status[presence.status]}</span>`;
 }
 
+function currentLayoutKey() {
+  return layoutMedia.matches ? "mobile" : "desktop";
+}
+
+function currentLayout() {
+  const key = currentLayoutKey();
+  return state.assets?.layouts?.[key] || state.assets?.layouts?.desktop || null;
+}
+
+function characterPlacement(presence, index) {
+  const layoutPlacement = currentLayout()?.placements?.[presence.userId];
+  const position = layoutPlacement || presence.position || { x: 50 + index * 4, y: 58 };
+  return {
+    x: position.x,
+    y: position.y,
+    z: position.z || position.y || 2,
+    scale: position.scale || 1,
+    label: position.label || "right"
+  };
+}
+
+function spriteUrlFor(presence) {
+  const sprite = state.assets?.sprites?.[presence.userId];
+  if (!sprite) return null;
+  return sprite.states?.[presence.status] || sprite.default || null;
+}
+
 function characterPositionStyle(presence, index) {
   const duration = {
     active: "3.2s",
     away: "5.4s",
     meeting: "2.4s"
   }[presence.status] || "3.6s";
+  const placement = characterPlacement(presence, index);
 
   return [
-    `--x:${presence.position?.x || 50}%`,
-    `--y:${presence.position?.y || 50}%`,
+    `--x:${placement.x}%`,
+    `--y:${placement.y}%`,
+    `--scale:${placement.scale}`,
+    `--z:${placement.z}`,
     `--delay:${(-0.45 * index).toFixed(2)}s`,
     `--duration:${duration}`
   ].join(";");
+}
+
+function characterPlacementClass(presence, index) {
+  const placement = characterPlacement(presence, index);
+  return placement.label === "left" ? "office-character--label-left" : "";
 }
 
 function characterStatusLabel(status) {
@@ -130,6 +178,16 @@ async function loadState() {
     throw new Error(result.message || "状態を取得できませんでした");
   }
   state.db = result;
+}
+
+async function loadOfficeAssets() {
+  try {
+    const response = await fetch("/assets/office-assets.json", { cache: "no-store" });
+    if (!response.ok) throw new Error("office assets not found");
+    state.assets = await response.json();
+  } catch {
+    state.assets = null;
+  }
 }
 
 function scanTokenFromPath() {
@@ -214,7 +272,7 @@ function renderSummary() {
 
 function renderMemberSelector() {
   const options = state.db.members.map((member) => `
-    <option value="${member.id}" ${member.id === selectedUserId ? "selected" : ""}>${member.name}</option>
+    <option value="${escapeHtml(member.id)}" ${member.id === selectedUserId ? "selected" : ""}>${escapeHtml(member.name)}</option>
   `).join("");
   $("#memberSelect").innerHTML = options;
   $("#mobileMemberSelect").innerHTML = options;
@@ -266,6 +324,19 @@ function renderQrState() {
   button.dataset.qrToken = activeToken;
 }
 
+function renderOfficeMapAssets() {
+  const layout = currentLayout();
+  const stage = $(".scene-stage");
+  const image = $("#officeRoomImage");
+  if (!layout || !stage || !image) return;
+
+  stage.style.setProperty("--office-aspect-ratio", layout.aspectRatio);
+  stage.dataset.layout = currentLayoutKey();
+  if (image.getAttribute("src") !== layout.backgroundUrl) {
+    image.src = layout.backgroundUrl;
+  }
+}
+
 function renderOfficePins() {
   const officePresences = activePresence().filter((presence) => presence.workMode === "office");
   $("#officePins").innerHTML = officePresences.map((presence, index) => {
@@ -274,8 +345,38 @@ function renderOfficePins() {
     const status = presence.status || "active";
     const statusText = labels.status[status] || labels.status.active;
     const seatText = presence.seatLabel || member.seatLabel || "座席未設定";
+    const spriteUrl = spriteUrlFor(presence);
+    const memberName = escapeHtml(member.name);
+    const escapedSeatText = escapeHtml(seatText);
+    const escapedStatusText = escapeHtml(statusText);
+    const statusLabel = escapeHtml(characterStatusLabel(status));
+    const placementClass = characterPlacementClass(presence, index);
+    if (spriteUrl) {
+      return `
+        <div class="office-character office-character--sprite office-character--${escapeHtml(status)} ${placementClass}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${memberName}、${escapedSeatText}、${escapedStatusText}、${formatTime(presence.since)}から">
+          <span class="office-character__sprite-wrap" aria-hidden="true">
+            <img class="office-character__sprite" src="${spriteUrl}" alt="">
+            <span class="office-character__status-dot"></span>
+            <span class="office-character__status-badge">${statusLabel}</span>
+            <span class="office-character__meeting-bubble">
+              MTG
+              <span class="office-character__voice">
+                <i></i>
+                <i></i>
+                <i></i>
+              </span>
+            </span>
+          </span>
+          <span class="office-character__label">
+            <strong>${memberName}</strong>
+            <span>${escapedStatusText} ${formatTime(presence.since)}〜</span>
+          </span>
+        </div>
+      `;
+    }
+
     return `
-      <div class="office-character office-character--${status}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${member.name}、${seatText}、${statusText}、${formatTime(presence.since)}から">
+      <div class="office-character office-character--${escapeHtml(status)} ${placementClass}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${memberName}、${escapedSeatText}、${escapedStatusText}、${formatTime(presence.since)}から">
         <span class="office-character__station" aria-hidden="true">
           <span class="office-character__shadow"></span>
           <span class="office-character__chair"></span>
@@ -295,7 +396,7 @@ function renderOfficePins() {
             </span>
           </span>
           <span class="office-character__status-dot"></span>
-          <span class="office-character__status-badge">${characterStatusLabel(status)}</span>
+          <span class="office-character__status-badge">${statusLabel}</span>
           <span class="office-character__meeting-bubble">
             MTG
             <span class="office-character__voice">
@@ -306,8 +407,8 @@ function renderOfficePins() {
           </span>
         </span>
         <span class="office-character__label">
-          <strong>${member.name}</strong>
-          <span>${statusText} ${formatTime(presence.since)}〜</span>
+          <strong>${memberName}</strong>
+          <span>${escapedStatusText} ${formatTime(presence.since)}〜</span>
         </span>
       </div>
     `;
@@ -323,10 +424,10 @@ function renderPresenceList() {
     const member = memberById(presence.userId);
     return `
       <article class="presence-row">
-        <img class="member-avatar" src="${member.avatarUrl}" alt="${member.name}">
+        <img class="member-avatar" src="${member.avatarUrl}" alt="${escapeHtml(member.name)}">
         <div>
-          <strong>${member.name}</strong>
-          <small>${presence.seatLabel}・${formatTime(presence.since)}〜・${elapsedText(presence.since)}</small>
+          <strong>${escapeHtml(member.name)}</strong>
+          <small>${escapeHtml(presence.seatLabel)}・${formatTime(presence.since)}〜・${elapsedText(presence.since)}</small>
         </div>
         ${createStatusPill(presence)}
       </article>
@@ -338,12 +439,15 @@ function renderRemoteGrid() {
   const remotePresences = activePresence().filter((presence) => presence.workMode === "remote");
   $("#remoteGrid").innerHTML = remotePresences.map((presence) => {
     const member = memberById(presence.userId);
+    const spriteUrl = spriteUrlFor(presence);
     return `
       <article class="remote-card">
-        <img class="member-avatar" src="${member.avatarUrl}" alt="${member.name}">
+        <span class="remote-card__avatar">
+          <img class="${spriteUrl ? "remote-card__sprite" : "member-avatar"}" src="${spriteUrl || member.avatarUrl}" alt="${escapeHtml(member.name)}">
+        </span>
         <div>
-          <strong>${member.name}</strong>
-          <small>${presence.seatLabel}・${labels.entryMethod[presence.entryMethod]}・${elapsedText(presence.since)}</small>
+          <strong>${escapeHtml(member.name)}</strong>
+          <small>${escapeHtml(presence.seatLabel)}・${labels.entryMethod[presence.entryMethod]}・${elapsedText(presence.since)}</small>
         </div>
         ${createStatusPill(presence)}
       </article>
@@ -356,7 +460,7 @@ function renderTimeline() {
     <article class="timeline-row">
       <time>${formatTime(event.createdAt)}</time>
       <div>
-        <strong>${event.message}</strong>
+        <strong>${escapeHtml(event.message)}</strong>
         <small>${labels.workMode[event.workMode] || ""}</small>
       </div>
     </article>
@@ -376,12 +480,12 @@ function renderHistoryRows(target, full = false) {
     return `
       <tr>
         ${cells}
-        <td>${member?.name || session.userId}</td>
+        <td>${escapeHtml(member?.name || session.userId)}</td>
         <td>${labels.workMode[session.workMode]}</td>
         <td>${formatTime(session.checkedInAt)}</td>
         <td>${formatTime(session.checkedOutAt)}</td>
         <td>${createStatusPill(presence)}</td>
-        ${full ? `<td>${session.memo || ""}</td>` : ""}
+        ${full ? `<td>${escapeHtml(session.memo || "")}</td>` : ""}
       </tr>
     `;
   }).join("");
@@ -407,12 +511,16 @@ function renderAnalytics() {
 function renderMembers() {
   $("#memberGrid").innerHTML = state.db.members.map((member) => {
     const presence = presenceByUser(member.id);
+    const previewPresence = presence || { userId: member.id, status: "active" };
+    const spriteUrl = spriteUrlFor(previewPresence);
     return `
       <article class="member-card">
-        <img class="member-avatar" src="${member.avatarUrl}" alt="${member.name}">
+        <span class="member-card__avatar">
+          <img class="${spriteUrl ? "member-card__sprite" : "member-avatar"}" src="${spriteUrl || member.avatarUrl}" alt="${escapeHtml(member.name)}">
+        </span>
         <div>
-          <strong>${member.name}</strong>
-          <small>${member.team}・${member.role}</small>
+          <strong>${escapeHtml(member.name)}</strong>
+          <small>${escapeHtml(member.team)}・${escapeHtml(member.role)}</small>
           ${presence ? createStatusPill(presence) : `<span class="status-pill">退室済み</span>`}
         </div>
       </article>
@@ -456,6 +564,7 @@ function render() {
   renderMemberSelector();
   renderOperator();
   renderSummary();
+  renderOfficeMapAssets();
   renderOfficePins();
   renderPresenceList();
   renderRemoteGrid();
@@ -533,7 +642,10 @@ async function boot() {
   state.scanToken = scanTokenFromPath();
   bindNavigation();
   bindActions();
-  await loadState();
+  layoutMedia.addEventListener("change", () => {
+    if (state.db) render();
+  });
+  await Promise.all([loadState(), loadOfficeAssets()]);
   render();
 
   if (window.location.pathname.startsWith("/scan/")) {

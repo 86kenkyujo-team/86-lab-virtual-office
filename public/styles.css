@@ -509,7 +509,7 @@ button {
 }
 
 .scene-stage {
-  aspect-ratio: 1040 / 790;
+  aspect-ratio: var(--office-aspect-ratio, 1672 / 941);
   min-width: 720px;
   position: relative;
 }
@@ -528,49 +528,62 @@ button {
   position: absolute;
 }
 
-.scene-callout {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 6px solid var(--remote);
-  border-radius: 8px;
-  box-shadow: 0 16px 30px rgba(15, 31, 61, 0.16);
-  color: var(--brand);
-  left: 38%;
-  min-height: 88px;
-  min-width: 260px;
-  padding: 18px 18px 14px;
-  position: absolute;
-  top: 21%;
-  z-index: 1;
-}
-
-.scene-callout strong,
-.scene-callout span {
-  display: block;
-}
-
-.scene-callout strong {
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.scene-callout span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 800;
-  margin-top: 5px;
-}
-
 .office-character {
   display: block;
   filter: drop-shadow(0 9px 13px rgba(15, 31, 61, 0.18));
   height: 58px;
   left: var(--x);
+  pointer-events: auto;
   position: absolute;
   top: var(--y);
   transform: translate(-50%, -50%);
   width: 56px;
-  z-index: 2;
+  z-index: var(--z, 2);
+}
+
+.office-character--sprite {
+  height: auto;
+  transform: translate(-50%, -100%);
+  width: calc(230px * var(--scale, 0.5));
+}
+
+.office-character__sprite-wrap {
+  animation: character-sprite-idle var(--duration, 3.2s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  display: block;
+  position: relative;
+  transform-origin: center bottom;
+}
+
+.office-character__sprite {
+  display: block;
+  height: auto;
+  image-rendering: pixelated;
+  width: 100%;
+}
+
+.office-character--sprite .office-character__status-dot {
+  right: 10%;
+  top: 13%;
+}
+
+.office-character--sprite .office-character__status-badge {
+  bottom: -4px;
+  right: -9px;
+}
+
+.office-character--sprite .office-character__meeting-bubble {
+  left: 64%;
+  top: 3%;
+}
+
+.office-character--sprite .office-character__label {
+  left: calc(100% + 8px);
+}
+
+.office-character--label-left .office-character__label {
+  left: auto;
+  right: calc(100% + 8px);
 }
 
 .office-character__station {
@@ -846,11 +859,17 @@ button {
   left: calc(100% + 7px);
   max-width: 128px;
   min-width: 112px;
+  opacity: 0;
   padding: 7px 9px;
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
+  transition: opacity 0.16s ease;
   z-index: 7;
+}
+
+.office-character:hover .office-character__label {
+  opacity: 1;
 }
 
 .office-character__label strong {
@@ -889,6 +908,10 @@ button {
   animation-name: character-meeting-nod;
 }
 
+.office-character--sprite.office-character--meeting .office-character__sprite-wrap {
+  animation-name: character-sprite-meeting;
+}
+
 .office-character--meeting .office-character__status-badge {
   background: var(--remote-soft);
   border-color: rgba(47, 111, 237, 0.22);
@@ -901,6 +924,12 @@ button {
 
 .office-character--away {
   filter: drop-shadow(0 7px 10px rgba(15, 31, 61, 0.12));
+}
+
+.office-character--sprite.office-character--away .office-character__sprite-wrap {
+  animation: none;
+  filter: saturate(0.88);
+  opacity: 0.82;
 }
 
 .office-character--away .office-character__station {
@@ -971,6 +1000,28 @@ button {
 
   50% {
     transform: translateX(-50%) translateY(-2px);
+  }
+}
+
+@keyframes character-sprite-idle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes character-sprite-meeting {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+
+  50% {
+    transform: translateY(-2px) rotate(1.5deg);
   }
 }
 
@@ -1071,6 +1122,7 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .office-character__shadow,
   .office-character__body,
+  .office-character__sprite-wrap,
   .office-character__arm,
   .office-character__keyboard span,
   .office-character__status-dot,
@@ -1111,8 +1163,8 @@ button {
 
 .presence-row strong,
 .timeline-row strong,
-.remote-card strong,
-.member-card strong {
+  .remote-card strong,
+  .member-card strong {
   color: var(--brand);
   display: block;
   font-size: 14px;
@@ -1160,10 +1212,35 @@ button {
   grid-template-columns: 58px minmax(0, 1fr) auto;
 }
 
+.remote-card__avatar {
+  align-items: center;
+  background: var(--remote-soft);
+  border: 3px solid var(--remote);
+  border-radius: 50%;
+  display: inline-flex;
+  height: 54px;
+  justify-content: center;
+  overflow: hidden;
+  width: 54px;
+}
+
 .remote-card .member-avatar {
   border: 3px solid var(--remote);
   height: 54px;
   width: 54px;
+}
+
+.remote-card__avatar .member-avatar {
+  border: 0;
+}
+
+.remote-card__sprite {
+  display: block;
+  height: 66px;
+  image-rendering: pixelated;
+  object-fit: contain;
+  object-position: center bottom;
+  width: 66px;
 }
 
 .lower-grid {
@@ -1287,12 +1364,37 @@ th {
   background: var(--surface);
   display: grid;
   gap: 12px;
-  grid-template-columns: 54px minmax(0, 1fr);
+  grid-template-columns: 62px minmax(0, 1fr);
+}
+
+.member-card__avatar {
+  align-items: end;
+  background: #f4f7f4;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: inline-flex;
+  height: 64px;
+  justify-content: center;
+  overflow: hidden;
+  width: 62px;
 }
 
 .member-card .member-avatar {
   height: 54px;
   width: 54px;
+}
+
+.member-card__avatar .member-avatar {
+  border: 0;
+}
+
+.member-card__sprite {
+  display: block;
+  height: 78px;
+  image-rendering: pixelated;
+  object-fit: contain;
+  object-position: center bottom;
+  width: 78px;
 }
 
 .settings-panel dl {
@@ -1578,6 +1680,11 @@ th {
   }
 
   .scene-stage {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .scene-stage[data-layout="desktop"] {
     min-width: 680px;
   }
 
@@ -1602,12 +1709,14 @@ th {
     top: -6px;
   }
 
-  .scene-callout {
-    left: 24px;
-    min-height: 0;
-    min-width: 188px;
-    padding: 12px 14px;
-    top: 24px;
+  .office-character--sprite {
+    height: auto;
+    width: calc(230px * var(--scale, 0.38));
+  }
+
+  .office-character--sprite .office-character__meeting-bubble {
+    left: 58%;
+    top: 2%;
   }
 
   .remote-card {

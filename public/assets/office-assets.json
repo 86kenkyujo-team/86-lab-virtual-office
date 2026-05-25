@@ -1,0 +1,150 @@
+{
+  "layouts": {
+    "desktop": {
+      "backgroundUrl": "/assets/offices/86-lab-office-desktop.png",
+      "aspectRatio": "1672 / 941",
+      "placements": {
+        "hachiro-motoki": {
+          "x": 31,
+          "y": 65,
+          "z": 65,
+          "scale": 0.48,
+          "label": "right"
+        },
+        "marubayashi-yuto": {
+          "x": 55,
+          "y": 68,
+          "z": 68,
+          "scale": 0.42,
+          "label": "right"
+        },
+        "taniguchi-kyoshiro": {
+          "x": 46,
+          "y": 67,
+          "z": 67,
+          "scale": 0.36,
+          "label": "right"
+        },
+        "miyabe-keishi": {
+          "x": 66,
+          "y": 64,
+          "z": 64,
+          "scale": 0.36,
+          "label": "left"
+        },
+        "kashima-sakuto": {
+          "x": 38,
+          "y": 60,
+          "z": 60,
+          "scale": 0.36,
+          "label": "right"
+        },
+        "kajita-koki": {
+          "x": 74,
+          "y": 70,
+          "z": 70,
+          "scale": 0.35,
+          "label": "left"
+        }
+      }
+    },
+    "mobile": {
+      "backgroundUrl": "/assets/offices/86-lab-office-mobile.png",
+      "aspectRatio": "941 / 1672",
+      "placements": {
+        "hachiro-motoki": {
+          "x": 29,
+          "y": 44,
+          "z": 44,
+          "scale": 0.34,
+          "label": "right"
+        },
+        "marubayashi-yuto": {
+          "x": 58,
+          "y": 58,
+          "z": 58,
+          "scale": 0.31,
+          "label": "left"
+        },
+        "taniguchi-kyoshiro": {
+          "x": 43,
+          "y": 63,
+          "z": 63,
+          "scale": 0.28,
+          "label": "right"
+        },
+        "miyabe-keishi": {
+          "x": 67,
+          "y": 47,
+          "z": 47,
+          "scale": 0.27,
+          "label": "left"
+        },
+        "kashima-sakuto": {
+          "x": 32,
+          "y": 49,
+          "z": 49,
+          "scale": 0.27,
+          "label": "right"
+        },
+        "kajita-koki": {
+          "x": 59,
+          "y": 70,
+          "z": 70,
+          "scale": 0.27,
+          "label": "left"
+        }
+      }
+    }
+  },
+  "sprites": {
+    "hachiro-motoki": {
+      "default": "/assets/members/hachiro-motoki/standing.png",
+      "states": {
+        "active": "/assets/members/hachiro-motoki/active.png",
+        "away": "/assets/members/hachiro-motoki/away.png",
+        "meeting": "/assets/members/hachiro-motoki/meeting.png"
+      }
+    },
+    "marubayashi-yuto": {
+      "default": "/assets/members/marubayashi-yuto/standing.png",
+      "states": {
+        "active": "/assets/members/marubayashi-yuto/standing-laptop.png",
+        "away": "/assets/members/marubayashi-yuto/drink.png",
+        "meeting": "/assets/members/marubayashi-yuto/seated-back-laptop.png"
+      }
+    },
+    "taniguchi-kyoshiro": {
+      "default": "/assets/members/taniguchi-kyoshiro/standing.png",
+      "states": {
+        "active": "/assets/members/taniguchi-kyoshiro/active.png",
+        "away": "/assets/members/taniguchi-kyoshiro/away.png",
+        "meeting": "/assets/members/taniguchi-kyoshiro/meeting.png"
+      }
+    },
+    "miyabe-keishi": {
+      "default": "/assets/members/miyabe-keishi/standing.png",
+      "states": {
+        "active": "/assets/members/miyabe-keishi/active.png",
+        "away": "/assets/members/miyabe-keishi/away.png",
+        "meeting": "/assets/members/miyabe-keishi/meeting.png"
+      }
+    },
+    "kashima-sakuto": {
+      "default": "/assets/members/kashima-sakuto/standing.png",
+      "states": {
+        "active": "/assets/members/kashima-sakuto/active.png",
+        "away": "/assets/members/kashima-sakuto/away.png",
+        "meeting": "/assets/members/kashima-sakuto/meeting.png"
+      }
+    },
+    "kajita-koki": {
+      "default": "/assets/members/kajita-koki/standing.png",
+      "states": {
+        "active": "/assets/members/kajita-koki/active.png",
+        "away": "/assets/members/kajita-koki/away.png",
+        "meeting": "/assets/members/kajita-koki/meeting.png"
+      }
+    }
+  }
+}
