@@ -55,142 +55,75 @@
       "seatLabel": "リモートブース 3"
     }
   ],
-  "currentPresence": [
-    {
-      "userId": "hachiro-motoki",
-      "workMode": "office",
-      "status": "active",
-      "entryMethod": "office_qr",
-      "since": "2026-05-24T09:05:00+09:00",
-      "lastSeenAt": "2026-05-24T10:12:00+09:00",
-      "seatLabel": "デスク A-1",
-      "position": {
-        "x": 31,
-        "y": 66
-      }
-    },
-    {
-      "userId": "marubayashi-yuto",
-      "workMode": "office",
-      "status": "active",
-      "entryMethod": "office_qr",
-      "since": "2026-05-24T09:18:00+09:00",
-      "lastSeenAt": "2026-05-24T10:18:00+09:00",
-      "seatLabel": "デスク A-2",
-      "position": {
-        "x": 54,
-        "y": 71
-      }
-    },
-    {
-      "userId": "taniguchi-kyoshiro",
-      "workMode": "remote",
-      "status": "active",
-      "entryMethod": "remote_manual",
-      "since": "2026-05-24T09:32:00+09:00",
-      "lastSeenAt": "2026-05-24T10:22:00+09:00",
-      "seatLabel": "リモートブース 1"
-    },
-    {
-      "userId": "miyabe-keishi",
-      "workMode": "office",
-      "status": "away",
-      "entryMethod": "office_qr",
-      "since": "2026-05-24T10:02:00+09:00",
-      "lastSeenAt": "2026-05-24T10:20:00+09:00",
-      "seatLabel": "デスク B-1",
-      "position": {
-        "x": 47,
-        "y": 80
-      }
-    },
-    {
-      "userId": "kashima-sakuto",
-      "workMode": "remote",
-      "status": "meeting",
-      "entryMethod": "remote_manual",
-      "since": "2026-05-24T09:47:00+09:00",
-      "lastSeenAt": "2026-05-24T10:19:00+09:00",
-      "seatLabel": "リモートブース 2"
-    },
-    {
-      "userId": "kajita-koki",
-      "workMode": "remote",
-      "status": "active",
-      "entryMethod": "remote_manual",
-      "since": "2026-05-24T09:56:00+09:00",
-      "lastSeenAt": "2026-05-24T10:16:00+09:00",
-      "seatLabel": "リモートブース 3"
-    }
-  ],
+  "currentPresence": [],
   "sessions": [
     {
       "id": "session-001",
       "userId": "hachiro-motoki",
       "workMode": "office",
       "entryMethod": "office_qr",
-      "checkedInAt": "2026-05-24T09:05:00+09:00",
-      "checkedOutAt": null,
-      "status": "active",
-      "memo": "午前は企画、午後はレビュー"
+      "checkedInAt": "2026-05-27T09:05:00+09:00",
+      "checkedOutAt": "2026-05-27T10:35:00+09:00",
+      "status": "checked_out",
+      "memo": "GPS入室テスト"
     },
     {
       "id": "session-002",
       "userId": "marubayashi-yuto",
       "workMode": "office",
       "entryMethod": "office_qr",
-      "checkedInAt": "2026-05-24T09:18:00+09:00",
-      "checkedOutAt": null,
-      "status": "active",
-      "memo": "制作作業"
+      "checkedInAt": "2026-05-27T09:18:00+09:00",
+      "checkedOutAt": "2026-05-27T10:42:00+09:00",
+      "status": "checked_out",
+      "memo": "GPS入室テスト"
     },
     {
       "id": "session-003",
       "userId": "taniguchi-kyoshiro",
       "workMode": "remote",
       "entryMethod": "remote_manual",
-      "checkedInAt": "2026-05-24T09:32:00+09:00",
-      "checkedOutAt": null,
-      "status": "active",
-      "memo": "リモート開発"
+      "checkedInAt": "2026-05-27T09:32:00+09:00",
+      "checkedOutAt": "2026-05-27T10:50:00+09:00",
+      "status": "checked_out",
+      "memo": "リモート入室テスト"
     },
     {
       "id": "session-004",
       "userId": "miyabe-keishi",
       "workMode": "office",
       "entryMethod": "office_qr",
-      "checkedInAt": "2026-05-24T10:02:00+09:00",
-      "checkedOutAt": null,
-      "status": "away",
-      "memo": "休憩中"
+      "checkedInAt": "2026-05-27T09:45:00+09:00",
+      "checkedOutAt": "2026-05-27T11:10:00+09:00",
+      "status": "checked_out",
+      "memo": "GPS入室テスト"
     },
     {
       "id": "session-005",
       "userId": "kashima-sakuto",
       "workMode": "remote",
       "entryMethod": "remote_manual",
-      "checkedInAt": "2026-05-24T09:47:00+09:00",
-      "checkedOutAt": null,
-      "status": "meeting",
-      "memo": "オンラインMTG"
+      "checkedInAt": "2026-05-27T09:47:00+09:00",
+      "checkedOutAt": "2026-05-27T11:03:00+09:00",
+      "status": "checked_out",
+      "memo": "リモート入室テスト"
     },
     {
       "id": "session-006",
       "userId": "kajita-koki",
       "workMode": "remote",
       "entryMethod": "remote_manual",
-      "checkedInAt": "2026-05-24T09:56:00+09:00",
-      "checkedOutAt": null,
-      "status": "active",
-      "memo": "運用対応"
+      "checkedInAt": "2026-05-27T09:56:00+09:00",
+      "checkedOutAt": "2026-05-27T11:15:00+09:00",
+      "status": "checked_out",
+      "memo": "リモート入室テスト"
     },
     {
       "id": "session-007",
       "userId": "hachiro-motoki",
       "workMode": "office",
       "entryMethod": "office_qr",
-      "checkedInAt": "2026-05-23T09:11:00+09:00",
-      "checkedOutAt": "2026-05-23T18:04:00+09:00",
+      "checkedInAt": "2026-05-27T08:50:00+09:00",
+      "checkedOutAt": "2026-05-27T09:20:00+09:00",
       "status": "checked_out",
       "memo": "終日オフィス"
     },
@@ -199,8 +132,8 @@
       "userId": "taniguchi-kyoshiro",
       "workMode": "remote",
       "entryMethod": "remote_manual",
-      "checkedInAt": "2026-05-23T10:00:00+09:00",
-      "checkedOutAt": "2026-05-23T17:42:00+09:00",
+      "checkedInAt": "2026-05-27T08:55:00+09:00",
+      "checkedOutAt": "2026-05-27T09:25:00+09:00",
       "status": "checked_out",
       "memo": "リモート"
     }
@@ -211,15 +144,15 @@
       "userId": "marubayashi-yuto",
       "type": "check_in",
       "workMode": "office",
-      "createdAt": "2026-05-24T09:18:00+09:00",
-      "message": "丸林勇登さんがQRでオフィスに入りました"
+      "createdAt": "2026-05-27T09:18:00+09:00",
+      "message": "丸林勇登さんがGPSでオフィスに入りました"
     },
     {
       "id": "event-002",
       "userId": "taniguchi-kyoshiro",
       "type": "remote_in",
       "workMode": "remote",
-      "createdAt": "2026-05-24T09:32:00+09:00",
+      "createdAt": "2026-05-27T09:32:00+09:00",
       "message": "谷口強志郎さんがリモートで入りました"
     },
     {
@@ -227,7 +160,7 @@
       "userId": "kashima-sakuto",
       "type": "meeting",
       "workMode": "remote",
-      "createdAt": "2026-05-24T09:47:00+09:00",
+      "createdAt": "2026-05-27T09:47:00+09:00",
       "message": "鹿島朔人さんが会議中になりました"
     },
     {
@@ -235,7 +168,7 @@
       "userId": "miyabe-keishi",
       "type": "away",
       "workMode": "office",
-      "createdAt": "2026-05-24T10:02:00+09:00",
+      "createdAt": "2026-05-27T10:02:00+09:00",
       "message": "宮部啓史さんが離席中になりました"
     }
   ]
