@@ -84,8 +84,12 @@ alter table attendance_sessions enable row level security;
 alter table current_presence enable row level security;
 alter table presence_events enable row level security;
 
+revoke all on offices, profiles, attendance_sessions, current_presence, presence_events from anon, public;
+
+grant usage on schema public to authenticated, service_role;
+grant usage on type work_mode, presence_status, entry_method to authenticated, service_role;
 grant select on offices, profiles, attendance_sessions, current_presence, presence_events to authenticated;
-grant all on offices, profiles, attendance_sessions, current_presence, presence_events to service_role;
+grant select, insert, update, delete on offices, profiles, attendance_sessions, current_presence, presence_events to service_role;
 
 drop policy if exists "authenticated can read offices" on offices;
 create policy "authenticated can read offices"
@@ -141,6 +145,7 @@ declare
   v_mode_label text;
   v_event_type text;
   v_expected_qr_token text;
+  v_existing_presence current_presence%rowtype;
 begin
   select *
   into v_profile
@@ -169,6 +174,68 @@ begin
     end if;
   end if;
 
+  v_seat_label := case
+    when p_work_mode = 'office' then
+      case
+        when p_user_id = 'hachiro-motoki' then 'デスク A-1'
+        when p_user_id = 'marubayashi-yuto' then 'デスク A-2'
+        when p_user_id = 'miyabe-keishi' then 'デスク B-1'
+        when p_user_id = 'taniguchi-kyoshiro' then 'デスク C-1'
+        when p_user_id = 'kashima-sakuto' then 'デスク C-2'
+        when p_user_id = 'kajita-koki' then 'デスク C-3'
+        else coalesce(v_profile.seat_label, 'デスク C-1')
+      end
+    else
+      case
+        when p_user_id = 'taniguchi-kyoshiro' then 'リモートブース 1'
+        when p_user_id = 'kashima-sakuto' then 'リモートブース 2'
+        when p_user_id = 'kajita-koki' then 'リモートブース 3'
+        else 'リモートブース'
+      end
+  end;
+
+  v_position_x := case
+    when p_work_mode <> 'office' then null
+    when p_user_id = 'hachiro-motoki' then 31
+    when p_user_id = 'marubayashi-yuto' then 54
+    when p_user_id = 'miyabe-keishi' then 47
+    when p_user_id = 'taniguchi-kyoshiro' then 45
+    when p_user_id = 'kashima-sakuto' then 38
+    when p_user_id = 'kajita-koki' then 74
+    else 50
+  end;
+
+  v_position_y := case
+    when p_work_mode <> 'office' then null
+    when p_user_id = 'hachiro-motoki' then 66
+    when p_user_id = 'marubayashi-yuto' then 71
+    when p_user_id = 'miyabe-keishi' then 80
+    when p_user_id = 'taniguchi-kyoshiro' then 70
+    when p_user_id = 'kashima-sakuto' then 65
+    when p_user_id = 'kajita-koki' then 72
+    else 58
+  end;
+
+  select *
+  into v_existing_presence
+  from current_presence
+  where user_id = p_user_id;
+
+  if found and v_existing_presence.work_mode = p_work_mode then
+    update current_presence
+    set last_seen_at = v_checked_at,
+        seat_label = v_seat_label,
+        position_x = v_position_x,
+        position_y = v_position_y
+    where user_id = p_user_id;
+
+    return jsonb_build_object(
+      'ok', true,
+      'unchanged', true,
+      'session_id', v_existing_presence.active_session_id
+    );
+  end if;
+
   update attendance_sessions
   set checked_out_at = v_checked_at,
       status = 'checked_out',
@@ -195,33 +262,6 @@ begin
     case when p_work_mode = 'office' then 'QR入室' else 'リモート入室' end
   )
   returning id into v_session_id;
-
-  v_seat_label := case
-    when p_work_mode = 'office' then coalesce(v_profile.seat_label, 'デスク C-1')
-    else coalesce(v_profile.seat_label, 'リモートブース')
-  end;
-
-  v_position_x := case
-    when p_work_mode <> 'office' then null
-    when p_user_id = 'hachiro-motoki' then 37
-    when p_user_id = 'marubayashi-yuto' then 55
-    when p_user_id = 'miyabe-keishi' then 71
-    when p_user_id = 'taniguchi-kyoshiro' then 47
-    when p_user_id = 'kashima-sakuto' then 62
-    when p_user_id = 'kajita-koki' then 47
-    else 50
-  end;
-
-  v_position_y := case
-    when p_work_mode <> 'office' then null
-    when p_user_id = 'hachiro-motoki' then 47
-    when p_user_id = 'marubayashi-yuto' then 54
-    when p_user_id = 'miyabe-keishi' then 47
-    when p_user_id = 'taniguchi-kyoshiro' then 61
-    when p_user_id = 'kashima-sakuto' then 55
-    when p_user_id = 'kajita-koki' then 61
-    else 58
-  end;
 
   insert into current_presence (
     user_id,
@@ -434,10 +474,10 @@ insert into current_presence (
   position_y
 )
 values
-  ('hachiro-motoki', '86-lab-osaka', 'office', 'active', 'office_qr', '2026-05-24T09:05:00+09:00', '2026-05-24T10:12:00+09:00', 'デスク A-1', 37, 47),
-  ('marubayashi-yuto', '86-lab-osaka', 'office', 'active', 'office_qr', '2026-05-24T09:18:00+09:00', '2026-05-24T10:18:00+09:00', 'デスク A-2', 55, 54),
+  ('hachiro-motoki', '86-lab-osaka', 'office', 'active', 'office_qr', '2026-05-24T09:05:00+09:00', '2026-05-24T10:12:00+09:00', 'デスク A-1', 31, 66),
+  ('marubayashi-yuto', '86-lab-osaka', 'office', 'active', 'office_qr', '2026-05-24T09:18:00+09:00', '2026-05-24T10:18:00+09:00', 'デスク A-2', 54, 71),
   ('taniguchi-kyoshiro', '86-lab-osaka', 'remote', 'active', 'remote_manual', '2026-05-24T09:32:00+09:00', '2026-05-24T10:22:00+09:00', 'リモートブース 1', null, null),
-  ('miyabe-keishi', '86-lab-osaka', 'office', 'away', 'office_qr', '2026-05-24T10:02:00+09:00', '2026-05-24T10:20:00+09:00', 'デスク B-1', 71, 47),
+  ('miyabe-keishi', '86-lab-osaka', 'office', 'away', 'office_qr', '2026-05-24T10:02:00+09:00', '2026-05-24T10:20:00+09:00', 'デスク B-1', 47, 80),
   ('kashima-sakuto', '86-lab-osaka', 'remote', 'meeting', 'remote_manual', '2026-05-24T09:47:00+09:00', '2026-05-24T10:19:00+09:00', 'リモートブース 2', null, null),
   ('kajita-koki', '86-lab-osaka', 'remote', 'active', 'remote_manual', '2026-05-24T09:56:00+09:00', '2026-05-24T10:16:00+09:00', 'リモートブース 3', null, null)
 on conflict (user_id) do update
@@ -474,6 +514,25 @@ on conflict (id) do update
 set status = excluded.status,
     checked_out_at = excluded.checked_out_at,
     memo = excluded.memo;
+
+update current_presence
+set active_session_id = case user_id
+  when 'hachiro-motoki' then '11111111-1111-1111-1111-111111111111'::uuid
+  when 'marubayashi-yuto' then '22222222-2222-2222-2222-222222222222'::uuid
+  when 'taniguchi-kyoshiro' then '33333333-3333-3333-3333-333333333333'::uuid
+  when 'miyabe-keishi' then '44444444-4444-4444-4444-444444444444'::uuid
+  when 'kashima-sakuto' then '55555555-5555-5555-5555-555555555555'::uuid
+  when 'kajita-koki' then '66666666-6666-6666-6666-666666666666'::uuid
+  else active_session_id
+end
+where user_id in (
+  'hachiro-motoki',
+  'marubayashi-yuto',
+  'taniguchi-kyoshiro',
+  'miyabe-keishi',
+  'kashima-sakuto',
+  'kajita-koki'
+);
 
 insert into presence_events (
   id,

@@ -25,6 +25,13 @@ const state = {
   scanToken: null
 };
 
+const imageFallbacks = {
+  brandIcon: "/assets/images/brand-icon.png",
+  officeBackground: "/assets/images/office-room.png"
+};
+const refreshIntervalMs = 30000;
+let refreshTimer = null;
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 const layoutMedia = window.matchMedia("(max-width: 860px)");
@@ -38,6 +45,34 @@ const htmlEntities = {
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => htmlEntities[char]);
+}
+
+function imageMarkup(src, alt, className, fallbackSrc = imageFallbacks.brandIcon) {
+  const safeSrc = src || fallbackSrc || imageFallbacks.brandIcon;
+  const classAttr = className ? ` class="${escapeHtml(className)}"` : "";
+  const fallbackAttr = fallbackSrc ? ` data-fallback-src="${escapeHtml(fallbackSrc)}"` : "";
+  return `<img${classAttr} src="${escapeHtml(safeSrc)}" alt="${escapeHtml(alt)}"${fallbackAttr}>`;
+}
+
+function setImage(image, src, alt, fallbackSrc = imageFallbacks.brandIcon) {
+  image.src = src || fallbackSrc || imageFallbacks.brandIcon;
+  image.alt = alt;
+  image.dataset.fallbackSrc = fallbackSrc || imageFallbacks.brandIcon;
+  image.classList.remove("is-fallback-image", "is-missing-image");
+}
+
+function handleImageError(event) {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement)) return;
+
+  const fallbackSrc = image.dataset.fallbackSrc;
+  if (fallbackSrc && image.getAttribute("src") !== fallbackSrc) {
+    image.classList.add("is-fallback-image");
+    image.src = fallbackSrc;
+    return;
+  }
+
+  image.classList.add("is-missing-image");
 }
 
 function toDate(value) {
@@ -116,19 +151,25 @@ function currentLayout() {
 }
 
 function characterPlacement(presence, index) {
-  const layoutPlacement = currentLayout()?.placements?.[presence.userId];
+  const layout = currentLayout();
+  const layoutPlacement = layout?.placements?.[presence.userId];
   const position = layoutPlacement || presence.position || { x: 50 + index * 4, y: 58 };
   return {
     x: position.x,
     y: position.y,
     z: position.z || position.y || 2,
     scale: position.scale || 1,
+    spriteHeight: position.spriteHeight || layout?.spriteHeight || null,
     label: position.label || "right"
   };
 }
 
+function spriteMetaFor(userId) {
+  return state.assets?.sprites?.[userId] || null;
+}
+
 function spriteUrlFor(presence) {
-  const sprite = state.assets?.sprites?.[presence.userId];
+  const sprite = spriteMetaFor(presence.userId);
   if (!sprite) return null;
   return sprite.states?.[presence.status] || sprite.default || null;
 }
@@ -145,23 +186,19 @@ function characterPositionStyle(presence, index) {
     `--x:${placement.x}%`,
     `--y:${placement.y}%`,
     `--scale:${placement.scale}`,
+    placement.spriteHeight ? `--sprite-display-height:${placement.spriteHeight}px` : "",
+    placement.spriteHeight ? "--sprite-display-width:max-content" : "",
+    placement.spriteHeight ? "--sprite-image-height:100%" : "",
+    placement.spriteHeight ? "--sprite-image-width:auto" : "",
     `--z:${placement.z}`,
     `--delay:${(-0.45 * index).toFixed(2)}s`,
     `--duration:${duration}`
-  ].join(";");
+  ].filter(Boolean).join(";");
 }
 
 function characterPlacementClass(presence, index) {
   const placement = characterPlacement(presence, index);
   return placement.label === "left" ? "office-character--label-left" : "";
-}
-
-function characterStatusLabel(status) {
-  return {
-    active: "作業",
-    away: "離席",
-    meeting: "MTG"
-  }[status] || "作業";
 }
 
 function showToast(message) {
@@ -285,14 +322,11 @@ function renderOperator() {
     ? `${labels.workMode[presence.workMode]}・${labels.status[presence.status]}・${formatTime(presence.since)}〜`
     : "未入室";
 
-  $("#currentUserAvatar").src = member.avatarUrl;
-  $("#currentUserAvatar").alt = member.name;
-  $("#operatorAvatar").src = member.avatarUrl;
-  $("#operatorAvatar").alt = member.name;
+  setImage($("#currentUserAvatar"), member.avatarUrl, member.name);
+  setImage($("#operatorAvatar"), member.avatarUrl, member.name);
   $("#operatorName").textContent = member.name;
   $("#operatorStatus").textContent = statusText;
-  $("#qrUserAvatar").src = member.avatarUrl;
-  $("#qrUserAvatar").alt = member.name;
+  setImage($("#qrUserAvatar"), member.avatarUrl, member.name);
   $("#qrUserName").textContent = member.name;
   renderQrState();
 
@@ -309,17 +343,22 @@ function renderQrState() {
   const officeToken = state.db.office.qrToken;
   const activeToken = state.scanToken || officeToken;
   const isInvalidScan = Boolean(state.scanToken && state.scanToken !== officeToken);
+  const current = selectedPresence();
+  const alreadyOffice = current?.workMode === "office";
+  const isReadOnly = state.db.persistence?.writable === false;
   const status = $("#qrStatus");
   const button = $("#dialogOfficeButton");
 
   $("#qrUrl").textContent = `/scan/${officeToken}`;
   status.textContent = isInvalidScan
     ? "このQRトークンは認証できません"
-    : state.scanToken
-      ? "QRトークン認証済み"
-      : "このQRでオフィス入室を記録します";
+    : alreadyOffice
+      ? "すでにオフィス入室中です"
+      : state.scanToken
+        ? "QRトークン認証済み"
+        : "このQRでオフィス入室を記録します";
   status.classList.toggle("is-error", isInvalidScan);
-  button.disabled = isInvalidScan || state.db.persistence?.writable === false;
+  button.disabled = isInvalidScan || isReadOnly || alreadyOffice;
   button.style.opacity = button.disabled ? "0.48" : "1";
   button.dataset.qrToken = activeToken;
 }
@@ -332,6 +371,8 @@ function renderOfficeMapAssets() {
 
   stage.style.setProperty("--office-aspect-ratio", layout.aspectRatio);
   stage.dataset.layout = currentLayoutKey();
+  image.dataset.fallbackSrc = imageFallbacks.officeBackground;
+  image.classList.remove("is-fallback-image", "is-missing-image");
   if (image.getAttribute("src") !== layout.backgroundUrl) {
     image.src = layout.backgroundUrl;
   }
@@ -346,18 +387,19 @@ function renderOfficePins() {
     const statusText = labels.status[status] || labels.status.active;
     const seatText = presence.seatLabel || member.seatLabel || "座席未設定";
     const spriteUrl = spriteUrlFor(presence);
-    const memberName = escapeHtml(member.name);
+    const assetName = spriteMetaFor(presence.userId)?.displayName || member.name;
+    const memberName = escapeHtml(member.name || assetName || presence.userId);
+    const escapedAssetName = escapeHtml(assetName);
     const escapedSeatText = escapeHtml(seatText);
     const escapedStatusText = escapeHtml(statusText);
-    const statusLabel = escapeHtml(characterStatusLabel(status));
     const placementClass = characterPlacementClass(presence, index);
+    const detailText = escapedStatusText;
+    const timeText = `${formatTime(presence.since)}〜`;
     if (spriteUrl) {
       return `
-        <div class="office-character office-character--sprite office-character--${escapeHtml(status)} ${placementClass}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${memberName}、${escapedSeatText}、${escapedStatusText}、${formatTime(presence.since)}から">
+        <div class="office-character office-character--sprite office-character--${escapeHtml(status)} ${placementClass}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${memberName}、${escapedSeatText}、${escapedStatusText}、${formatTime(presence.since)}から" tabindex="0" data-member-id="${escapeHtml(member.id)}" data-member-name="${memberName}" data-asset-name="${escapedAssetName}" data-sprite-src="${escapeHtml(spriteUrl)}">
           <span class="office-character__sprite-wrap" aria-hidden="true">
-            <img class="office-character__sprite" src="${spriteUrl}" alt="">
-            <span class="office-character__status-dot"></span>
-            <span class="office-character__status-badge">${statusLabel}</span>
+            ${imageMarkup(spriteUrl, "", "office-character__sprite", member.avatarUrl)}
             <span class="office-character__meeting-bubble">
               MTG
               <span class="office-character__voice">
@@ -369,20 +411,21 @@ function renderOfficePins() {
           </span>
           <span class="office-character__label">
             <strong>${memberName}</strong>
-            <span>${escapedStatusText} ${formatTime(presence.since)}〜</span>
+            <span>${detailText}</span>
+            <span>${timeText}</span>
           </span>
         </div>
       `;
     }
 
     return `
-      <div class="office-character office-character--${escapeHtml(status)} ${placementClass}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${memberName}、${escapedSeatText}、${escapedStatusText}、${formatTime(presence.since)}から">
+      <div class="office-character office-character--${escapeHtml(status)} ${placementClass}" style="${characterPositionStyle(presence, index)}" role="img" aria-label="${memberName}、${escapedSeatText}、${escapedStatusText}、${formatTime(presence.since)}から" tabindex="0" data-member-id="${escapeHtml(member.id)}" data-member-name="${memberName}" data-asset-name="${escapedAssetName}">
         <span class="office-character__station" aria-hidden="true">
           <span class="office-character__shadow"></span>
           <span class="office-character__chair"></span>
           <span class="office-character__body">
             <span class="office-character__head">
-              <img class="office-character__face" src="${member.avatarUrl}" alt="">
+              ${imageMarkup(member.avatarUrl, "", "office-character__face")}
             </span>
             <span class="office-character__torso"></span>
             <span class="office-character__arm office-character__arm--left"></span>
@@ -395,8 +438,6 @@ function renderOfficePins() {
               <span></span>
             </span>
           </span>
-          <span class="office-character__status-dot"></span>
-          <span class="office-character__status-badge">${statusLabel}</span>
           <span class="office-character__meeting-bubble">
             MTG
             <span class="office-character__voice">
@@ -408,7 +449,8 @@ function renderOfficePins() {
         </span>
         <span class="office-character__label">
           <strong>${memberName}</strong>
-          <span>${escapedStatusText} ${formatTime(presence.since)}〜</span>
+          <span>${detailText}</span>
+          <span>${timeText}</span>
         </span>
       </div>
     `;
@@ -422,9 +464,10 @@ function renderPresenceList() {
 
   $("#presenceList").innerHTML = rows.map((presence) => {
     const member = memberById(presence.userId);
+    if (!member) return "";
     return `
       <article class="presence-row">
-        <img class="member-avatar" src="${member.avatarUrl}" alt="${escapeHtml(member.name)}">
+        ${imageMarkup(member.avatarUrl, member.name, "member-avatar")}
         <div>
           <strong>${escapeHtml(member.name)}</strong>
           <small>${escapeHtml(presence.seatLabel)}・${formatTime(presence.since)}〜・${elapsedText(presence.since)}</small>
@@ -439,11 +482,12 @@ function renderRemoteGrid() {
   const remotePresences = activePresence().filter((presence) => presence.workMode === "remote");
   $("#remoteGrid").innerHTML = remotePresences.map((presence) => {
     const member = memberById(presence.userId);
+    if (!member) return "";
     const spriteUrl = spriteUrlFor(presence);
     return `
       <article class="remote-card">
         <span class="remote-card__avatar">
-          <img class="${spriteUrl ? "remote-card__sprite" : "member-avatar"}" src="${spriteUrl || member.avatarUrl}" alt="${escapeHtml(member.name)}">
+          ${imageMarkup(spriteUrl || member.avatarUrl, member.name, spriteUrl ? "remote-card__sprite" : "member-avatar", member.avatarUrl)}
         </span>
         <div>
           <strong>${escapeHtml(member.name)}</strong>
@@ -516,7 +560,7 @@ function renderMembers() {
     return `
       <article class="member-card">
         <span class="member-card__avatar">
-          <img class="${spriteUrl ? "member-card__sprite" : "member-avatar"}" src="${spriteUrl || member.avatarUrl}" alt="${escapeHtml(member.name)}">
+          ${imageMarkup(spriteUrl || member.avatarUrl, member.name, spriteUrl ? "member-card__sprite" : "member-avatar", member.avatarUrl)}
         </span>
         <div>
           <strong>${escapeHtml(member.name)}</strong>
@@ -533,6 +577,7 @@ function renderCurrentUserActions() {
   const remoteButton = $("#remoteButton");
   const officeButton = $("#officeButton");
   const checkoutButton = $("#checkoutButton");
+  const isReadOnly = state.db.persistence?.writable === false;
 
   if (current?.workMode === "remote") {
     remoteButton.textContent = "リモート中";
@@ -541,8 +586,12 @@ function renderCurrentUserActions() {
   }
 
   officeButton.textContent = current?.workMode === "office" ? "オフィス入室中" : "QRでオフィス入室";
-  checkoutButton.disabled = !current;
-  checkoutButton.style.opacity = current ? "1" : "0.48";
+  remoteButton.disabled = isReadOnly || current?.workMode === "remote";
+  officeButton.disabled = isReadOnly || current?.workMode === "office";
+  checkoutButton.disabled = isReadOnly || !current;
+  remoteButton.style.opacity = remoteButton.disabled ? "0.48" : "1";
+  officeButton.style.opacity = officeButton.disabled ? "0.48" : "1";
+  checkoutButton.style.opacity = checkoutButton.disabled ? "0.48" : "1";
 }
 
 function renderSettings() {
@@ -586,6 +635,18 @@ function bindNavigation() {
       $$("[data-view-button]").forEach((item) => item.classList.toggle("is-active", item.dataset.viewButton === view));
     });
   });
+}
+
+function startPolling() {
+  if (refreshTimer) window.clearInterval(refreshTimer);
+  refreshTimer = window.setInterval(async () => {
+    try {
+      await loadState();
+      render();
+    } catch (error) {
+      console.warn("Failed to refresh presence state", error);
+    }
+  }, refreshIntervalMs);
 }
 
 function bindActions() {
@@ -640,6 +701,7 @@ function bindActions() {
 
 async function boot() {
   state.scanToken = scanTokenFromPath();
+  document.addEventListener("error", handleImageError, true);
   bindNavigation();
   bindActions();
   layoutMedia.addEventListener("change", () => {
@@ -647,6 +709,7 @@ async function boot() {
   });
   await Promise.all([loadState(), loadOfficeAssets()]);
   render();
+  startPolling();
 
   if (window.location.pathname.startsWith("/scan/")) {
     renderQrState();

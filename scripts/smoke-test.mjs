@@ -76,6 +76,21 @@ try {
   presence = result.state.currentPresence.find((item) => item.userId === "taniguchi-kyoshiro");
   assert(presence?.status === "away", "status update should be reflected in current presence");
 
+  const sessionCountBeforeReentry = result.state.sessions.length;
+  const eventCountBeforeReentry = result.state.events.length;
+  result = await store.updatePresence({
+    userId: "taniguchi-kyoshiro",
+    workMode: "office",
+    status: "active",
+    entryMethod: "office_qr",
+    qrToken: state.office.qrToken
+  });
+  assert(result.ok && result.unchanged, "same-mode check-in should be idempotent");
+  presence = result.state.currentPresence.find((item) => item.userId === "taniguchi-kyoshiro");
+  assert(presence?.status === "away", "same-mode check-in should preserve current status");
+  assert(result.state.sessions.length === sessionCountBeforeReentry, "same-mode check-in should not add a session");
+  assert(result.state.events.length === eventCountBeforeReentry, "same-mode check-in should not add an event");
+
   process.env.VERCEL = "1";
   const vercelStore = await import(`../api/_lib/store.js?vercel=${Date.now()}`);
   const blocked = await vercelStore.updatePresence({

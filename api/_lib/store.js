@@ -32,19 +32,43 @@ await loadEnvFile(path.join(process.cwd(), ".env.local"));
 
 const dbPath = path.resolve(process.env.PRESENCE_DB_PATH || path.join(process.cwd(), "data", "presence-db.json"));
 const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabaseServerKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const forceJsonStore = process.env.PRESENCE_DB_FORCE_JSON === "1";
-const dataSource = !forceJsonStore && supabaseUrl && supabaseServiceKey ? "supabase" : "json";
+const dataSource = !forceJsonStore && supabaseUrl && supabaseServerKey ? "supabase" : "json";
 const isVercel = Boolean(process.env.VERCEL);
 const missingSupabaseEnv = [
   ["SUPABASE_URL", supabaseUrl],
-  ["SUPABASE_SERVICE_ROLE_KEY", supabaseServiceKey]
+  ["SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY", supabaseServerKey]
 ].filter(([, value]) => !value).map(([key]) => key);
 const fallbackOffice = {
   id: "86-lab-osaka",
   name: "86研究所",
   location: "大阪オフィス 6F",
   qrToken: "86-lab-office-main"
+};
+const officeSeatLabels = {
+  "hachiro-motoki": "デスク A-1",
+  "marubayashi-yuto": "デスク A-2",
+  "miyabe-keishi": "デスク B-1",
+  "taniguchi-kyoshiro": "デスク C-1",
+  "kashima-sakuto": "デスク C-2",
+  "kajita-koki": "デスク C-3"
+};
+const remoteSeatLabels = {
+  "taniguchi-kyoshiro": "リモートブース 1",
+  "kashima-sakuto": "リモートブース 2",
+  "kajita-koki": "リモートブース 3",
+  "hachiro-motoki": "リモートブース 4",
+  "marubayashi-yuto": "リモートブース 5",
+  "miyabe-keishi": "リモートブース 6"
+};
+const defaultOfficePositions = {
+  "hachiro-motoki": { x: 31, y: 66 },
+  "marubayashi-yuto": { x: 54, y: 71 },
+  "taniguchi-kyoshiro": { x: 45, y: 70 },
+  "miyabe-keishi": { x: 47, y: 80 },
+  "kashima-sakuto": { x: 38, y: 65 },
+  "kajita-koki": { x: 74, y: 72 }
 };
 
 function localDataSource() {
@@ -131,8 +155,8 @@ async function supabaseRequest(route, options = {}) {
   const response = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/${route}`, {
     method: options.method || "GET",
     headers: {
-      apikey: supabaseServiceKey,
-      authorization: `Bearer ${supabaseServiceKey}`,
+      apikey: supabaseServerKey,
+      authorization: `Bearer ${supabaseServerKey}`,
       "content-type": "application/json",
       ...(options.headers || {})
     },
@@ -279,6 +303,15 @@ function closeActiveSessions(db, userId, checkedOutAt, reason = "manual_checkout
   });
 }
 
+function officePositionFor(userId) {
+  return defaultOfficePositions[userId] || { x: 50, y: 58 };
+}
+
+function seatLabelFor(userId, workMode, fallbackLabel) {
+  if (workMode === "office") return officeSeatLabels[userId] || fallbackLabel || "デスク C-1";
+  return remoteSeatLabels[userId] || fallbackLabel || "リモートブース";
+}
+
 async function updateSupabasePresence(payload) {
   if (payload.action === "checkout") {
     await supabaseRequest("rpc/checkout_presence", {
@@ -300,10 +333,17 @@ async function updateSupabasePresence(payload) {
   }
 
   const workMode = payload.workMode === "office" ? "office" : "remote";
+  const status = payload.status || "active";
   if (workMode === "office") {
     const offices = await supabaseRequest("offices?select=id,name,location,qr_token&limit=1");
     const qrCheck = validateOfficeQrToken(mapOffice(offices[0]).qrToken, payload.qrToken);
     if (!qrCheck.ok) return { ...qrCheck, state: await readSupabaseState() };
+  }
+
+  const currentState = await readSupabaseState();
+  const existing = currentState.currentPresence.find((presence) => presence.userId === payload.userId);
+  if (existing?.workMode === workMode) {
+    return { ok: true, unchanged: true, state: currentState };
   }
 
   await supabaseRequest("rpc/check_in_presence", {
@@ -311,7 +351,7 @@ async function updateSupabasePresence(payload) {
     body: {
       p_user_id: payload.userId,
       p_work_mode: workMode,
-      p_status: payload.status || "active",
+      p_status: status,
       p_entry_method: payload.entryMethod || (workMode === "office" ? "office_qr" : "remote_manual"),
       p_qr_token: workMode === "office" ? payload.qrToken : null
     }
@@ -378,8 +418,23 @@ async function updateJsonPresence(payload) {
 
   const existing = db.currentPresence.find((presence) => presence.userId === user.id);
   const position = workMode === "office"
-    ? existing?.position || { x: 47, y: 61 }
+    ? officePositionFor(user.id)
     : undefined;
+  const seatLabel = seatLabelFor(user.id, workMode, user.seatLabel);
+
+  if (existing?.workMode === workMode) {
+    db.currentPresence = db.currentPresence.map((presence) => {
+      if (presence.userId !== user.id) return presence;
+      return {
+        ...presence,
+        lastSeenAt: checkedAt,
+        seatLabel,
+        ...(position ? { position } : { position: undefined })
+      };
+    });
+    await writeDb(db);
+    return { ok: true, unchanged: true, state: withDataSource(db, localDataSource()) };
+  }
 
   closeActiveSessions(db, user.id, checkedAt, "mode_switch");
 
@@ -392,7 +447,7 @@ async function updateJsonPresence(payload) {
       entryMethod,
       since: checkedAt,
       lastSeenAt: checkedAt,
-      seatLabel: workMode === "office" ? "デスク C-1" : "リモートブース 1",
+      seatLabel,
       ...(position ? { position } : {})
     }
   ];
@@ -422,7 +477,7 @@ export async function updatePresence(payload) {
     return {
       ok: false,
       error: "persistent_database_required",
-      message: "本番環境ではSupabase環境変数が必要です。SUPABASE_URL と SUPABASE_SERVICE_ROLE_KEY を設定してください。",
+      message: "本番環境ではSupabase環境変数が必要です。SUPABASE_URL と SUPABASE_SECRET_KEY または SUPABASE_SERVICE_ROLE_KEY を設定してください。",
       state: await readLocalState()
     };
   }

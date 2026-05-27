@@ -8,6 +8,8 @@
     "check:supabase": "node scripts/check-supabase.mjs",
     "dev": "node server.mjs",
     "start": "node server.mjs",
-    "test": "node scripts/smoke-test.mjs"
+    "test": "node scripts/smoke-test.mjs && node scripts/http-smoke-test.mjs",
+    "test:http": "node scripts/http-smoke-test.mjs",
+    "test:store": "node scripts/smoke-test.mjs"
   }
 }

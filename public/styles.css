@@ -542,34 +542,32 @@ button {
 }
 
 .office-character--sprite {
-  height: auto;
+  height: var(--sprite-display-height, auto);
   transform: translate(-50%, -100%);
-  width: calc(230px * var(--scale, 0.5));
+  width: var(--sprite-display-width, calc(230px * var(--scale, 0.5)));
 }
 
 .office-character__sprite-wrap {
   animation: character-sprite-idle var(--duration, 3.2s) ease-in-out infinite;
   animation-delay: var(--delay, 0s);
   display: block;
+  height: 100%;
   position: relative;
   transform-origin: center bottom;
+  width: var(--sprite-display-width, 100%);
 }
 
 .office-character__sprite {
   display: block;
-  height: auto;
+  height: var(--sprite-image-height, auto);
   image-rendering: pixelated;
-  width: 100%;
+  max-width: none;
+  width: var(--sprite-image-width, 100%);
 }
 
 .office-character--sprite .office-character__status-dot {
   right: 10%;
   top: 13%;
-}
-
-.office-character--sprite .office-character__status-badge {
-  bottom: -4px;
-  right: -9px;
 }
 
 .office-character--sprite .office-character__meeting-bubble {
@@ -578,12 +576,15 @@ button {
 }
 
 .office-character--sprite .office-character__label {
-  left: calc(100% + 8px);
+  left: 50%;
+  right: auto;
+  top: -8px;
+  transform: translate(-50%, -100%);
 }
 
 .office-character--label-left .office-character__label {
-  left: auto;
-  right: calc(100% + 8px);
+  left: 50%;
+  right: auto;
 }
 
 .office-character__station {
@@ -776,25 +777,6 @@ button {
   z-index: 4;
 }
 
-.office-character__status-badge {
-  align-items: center;
-  background: var(--office-soft);
-  border: 1px solid rgba(7, 147, 101, 0.22);
-  border-radius: 999px;
-  bottom: 0;
-  color: var(--office);
-  display: inline-flex;
-  font-size: 10px;
-  font-weight: 900;
-  justify-content: center;
-  min-height: 17px;
-  padding: 0 5px;
-  position: absolute;
-  right: -5px;
-  white-space: nowrap;
-  z-index: 5;
-}
-
 .office-character__meeting-bubble {
   align-items: center;
   animation: meeting-bubble var(--duration, 2.4s) ease-in-out infinite;
@@ -851,31 +833,49 @@ button {
 }
 
 .office-character__label {
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.98);
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 7px;
+  box-shadow: 0 7px 18px rgba(15, 31, 61, 0.18);
   color: var(--brand);
   display: block;
   left: calc(100% + 7px);
-  max-width: 128px;
-  min-width: 112px;
+  line-height: 1.18;
+  max-width: 104px;
+  min-width: 76px;
   opacity: 0;
-  padding: 7px 9px;
+  padding: 4px 5px;
+  pointer-events: none;
   position: absolute;
-  top: 50%;
+  top: 46%;
   transform: translateY(-50%);
   transition: opacity 0.16s ease;
-  z-index: 7;
+  z-index: 14;
+}
+
+.office-character:hover,
+.office-character:focus-visible {
+  z-index: 999;
 }
 
 .office-character:hover .office-character__label {
   opacity: 1;
 }
 
+.office-character:focus-visible {
+  outline: 2px solid rgba(47, 111, 237, 0.78);
+  outline-offset: 4px;
+}
+
+.office-character:focus-visible .office-character__label {
+  opacity: 1;
+}
+
 .office-character__label strong {
   display: block;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 900;
+  line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -884,10 +884,26 @@ button {
 .office-character__label span {
   color: var(--muted);
   display: block;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: 800;
-  margin-top: 3px;
+  line-height: 1.15;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+img.is-fallback-image {
+  filter: saturate(0.9);
+}
+
+img.is-missing-image {
+  opacity: 0.35;
+}
+
+.office-room.is-missing-image {
+  background: #eef2ef;
+  object-fit: contain;
 }
 
 .office-character--meeting .office-character__head {
@@ -912,12 +928,6 @@ button {
   animation-name: character-sprite-meeting;
 }
 
-.office-character--meeting .office-character__status-badge {
-  background: var(--remote-soft);
-  border-color: rgba(47, 111, 237, 0.22);
-  color: var(--remote);
-}
-
 .office-character--meeting .office-character__meeting-bubble {
   display: inline-flex;
 }
@@ -928,12 +938,12 @@ button {
 
 .office-character--sprite.office-character--away .office-character__sprite-wrap {
   animation: none;
-  filter: saturate(0.88);
-  opacity: 0.82;
+  filter: saturate(0.92) contrast(1.04);
+  opacity: 1;
 }
 
 .office-character--away .office-character__station {
-  opacity: 0.82;
+  opacity: 1;
   transform: translate(7px, 4px);
 }
 
@@ -944,7 +954,7 @@ button {
 }
 
 .office-character--away .office-character__body {
-  opacity: 0.72;
+  opacity: 1;
   transform: translateX(-50%) rotate(-3deg);
 }
 
@@ -984,12 +994,6 @@ button {
 
 .office-character--away .office-character__status-dot {
   animation-duration: 2.8s;
-}
-
-.office-character--away .office-character__status-badge {
-  background: var(--away-soft);
-  border-color: rgba(245, 158, 11, 0.3);
-  color: var(--away);
 }
 
 @keyframes character-work {
@@ -1688,10 +1692,6 @@ th {
     min-width: 680px;
   }
 
-  .office-character__label {
-    display: none;
-  }
-
   .office-character {
     height: 56px;
     width: 54px;
@@ -1710,8 +1710,8 @@ th {
   }
 
   .office-character--sprite {
-    height: auto;
-    width: calc(230px * var(--scale, 0.38));
+    height: var(--sprite-display-height, auto);
+    width: var(--sprite-display-width, calc(230px * var(--scale, 0.38)));
   }
 
   .office-character--sprite .office-character__meeting-bubble {
@@ -1784,7 +1784,7 @@ th {
     border-top: 1px solid var(--line);
     bottom: 0;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     left: 0;
     padding: 8px 12px 10px;
     position: fixed;

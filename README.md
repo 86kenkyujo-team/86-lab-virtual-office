@@ -24,7 +24,7 @@ Vercelでは `vercel.json` により `dist` を静的出力として配信し、
 - Supabase移行用スキーマと初期データ: `supabase/schema.sql`
 - Supabase接続設定サンプル: `.env.example`
 
-環境変数 `SUPABASE_URL` と `SUPABASE_SERVICE_ROLE_KEY` がある場合、サーバーAPIはSupabase REST/RPCを使います。未設定の場合はローカルJSON DBで動きます。
+環境変数 `SUPABASE_URL` と `SUPABASE_SECRET_KEY` または `SUPABASE_SERVICE_ROLE_KEY` がある場合、サーバーAPIはSupabase REST/RPCを使います。未設定の場合はローカルJSON DBで動きます。
 
 ```bash
 cp .env.example .env.local
@@ -41,7 +41,9 @@ npm run build
 npm run check:supabase
 ```
 
-`npm run check:supabase` は `.env.local` または環境変数の `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` を使ってSupabaseの読み取り疎通を確認します。
+`npm test` はローカルJSON DBの store 直接テストと、実際に `server.mjs` を起動するHTTPテストを実行します。
+`npm run check:supabase` は `.env.local` または環境変数の `SUPABASE_URL` / `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY` を使ってSupabaseの読み取り疎通を確認します。
+テストデータを更新してよいSupabase環境では `npm run check:supabase -- --write` でQR入室、ステータス更新、退室、リモート入室のRPC書き込みまで確認できます。
 
 ## MVPでできること
 
