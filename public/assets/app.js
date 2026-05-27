@@ -22,7 +22,10 @@ const labels = {
 const state = {
   db: null,
   assets: null,
-  scanToken: null
+  scanToken: null,
+  scanHandled: false,
+  routeMode: "kiosk",
+  screen: "kiosk"
 };
 
 const imageFallbacks = {
@@ -30,7 +33,11 @@ const imageFallbacks = {
   officeBackground: "/assets/images/office-room.png"
 };
 const refreshIntervalMs = 30000;
+const completionDurationMs = 2400;
+const boardIdleReturnMs = 18000;
 let refreshTimer = null;
+let completionTimer = null;
+let kioskReturnTimer = null;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -257,17 +264,187 @@ async function updatePresence(payload, message) {
       state.db = result.state;
       render();
     }
-    return;
+    return result;
   }
   state.db = result.state;
   render();
   showToast(message);
+  return result;
 }
 
-function setSelectedUser(userId) {
+function setSelectedUser(userId, options = {}) {
   selectedUserId = userId;
   localStorage.setItem("selectedMemberId", selectedUserId);
   render();
+  renderKioskScreen();
+  if (options.message) showToast(options.message);
+}
+
+function routeModeFromPath() {
+  if (window.location.pathname.startsWith("/view") || window.location.pathname.startsWith("/presence")) {
+    return "viewer";
+  }
+  return "kiosk";
+}
+
+function kioskActionFor(userId) {
+  const presence = presenceByUser(userId);
+  if (!presence) {
+    return {
+      type: "checkin",
+      label: "オフィス出勤する",
+      status: "未出勤です。名前を確認して出勤を記録します。",
+      message: "オフィス出勤を記録しました",
+      modeClass: "mode-pill--office"
+    };
+  }
+  if (presence.workMode === "office") {
+    return {
+      type: "checkout",
+      label: "退勤する",
+      status: `オフィス勤務中です。${formatTime(presence.since)}から在籍しています。`,
+      message: "退勤を記録しました",
+      modeClass: "mode-pill--checked-out"
+    };
+  }
+  return {
+    type: "switch-office",
+    label: "オフィス出勤に切り替える",
+    status: `現在はリモート勤務中です。${formatTime(presence.since)}から在籍しています。`,
+    message: "オフィス勤務へ切り替えました",
+    modeClass: "mode-pill--office"
+  };
+}
+
+function renderKioskScreen() {
+  if (!state.db) return;
+  const kioskSelect = $("#kioskMemberSelect");
+  const kioskList = $("#kioskMemberList");
+  const action = kioskActionFor(selectedUserId);
+  const scanCopy = state.scanToken
+    ? "QRを読み取りました。メンバーを選ぶとオフィス出勤を記録します。"
+    : "入口タブレットで自分の名前を選ぶと、出勤または退勤を記録します。";
+
+  $("#kioskCopy").textContent = scanCopy;
+  kioskSelect.innerHTML = state.db.members.map((member) => `
+    <option value="${escapeHtml(member.id)}" ${member.id === selectedUserId ? "selected" : ""}>${escapeHtml(member.name)}</option>
+  `).join("");
+  $("#kioskStatus").textContent = action.status;
+  const actionButton = $("#kioskActionButton");
+  actionButton.textContent = action.label;
+  actionButton.classList.toggle("primary-button--checkout", action.type === "checkout");
+  kioskList.innerHTML = state.db.members.map((member) => {
+    const presence = presenceByUser(member.id);
+    const rowAction = kioskActionFor(member.id);
+    const statusText = presence
+      ? `${labels.workMode[presence.workMode]}・${labels.status[presence.status]}`
+      : "未出勤";
+    return `
+    <button class="login-member-row ${member.id === selectedUserId ? "is-selected" : ""}" type="button" data-kiosk-member="${escapeHtml(member.id)}">
+      ${imageMarkup(member.avatarUrl, member.name, "member-avatar")}
+      <span>
+        <strong>${escapeHtml(member.name)}</strong>
+        <small>${escapeHtml(statusText)}・${escapeHtml(rowAction.label)}</small>
+      </span>
+    </button>
+  `;
+  }).join("");
+}
+
+function clearScreenTimers() {
+  if (completionTimer) window.clearTimeout(completionTimer);
+  if (kioskReturnTimer) window.clearTimeout(kioskReturnTimer);
+  completionTimer = null;
+  kioskReturnTimer = null;
+}
+
+function setScreen(screen) {
+  state.screen = screen;
+  $("#kioskScreen").hidden = screen !== "kiosk";
+  $("#completionScreen").hidden = screen !== "completion";
+  $("#app").hidden = screen !== "board" && screen !== "viewer";
+  document.body.classList.toggle("is-kiosk-view", screen === "kiosk");
+  document.body.classList.toggle("is-completion-view", screen === "completion");
+  document.body.classList.toggle("is-readonly-board", screen === "board" || screen === "viewer");
+  document.body.classList.toggle("is-viewer-page", screen === "viewer");
+}
+
+function showKiosk() {
+  clearScreenTimers();
+  state.scanHandled = false;
+  setScreen("kiosk");
+  renderKioskScreen();
+}
+
+function showBoardPreview() {
+  clearScreenTimers();
+  showView("office");
+  setScreen("board");
+  render();
+  scheduleKioskReturn();
+}
+
+function showViewer() {
+  clearScreenTimers();
+  showView("office");
+  setScreen("viewer");
+  render();
+}
+
+function showCompletion(member, action) {
+  clearScreenTimers();
+  setImage($("#completionAvatar"), member.avatarUrl, member.name);
+  $("#completionTitle").textContent = action.type === "checkout" ? "退勤を記録しました" : "出勤を記録しました";
+  $("#completionMessage").textContent = `${member.name}さん、${action.message}。`;
+  const meta = $("#completionMeta");
+  meta.textContent = action.type === "checkout" ? "退勤完了" : "オフィス勤務";
+  meta.className = `mode-pill ${action.modeClass}`;
+  setScreen("completion");
+  completionTimer = window.setTimeout(
+    action.type === "checkout" ? showKiosk : showBoardPreview,
+    completionDurationMs
+  );
+}
+
+function scheduleKioskReturn() {
+  if (state.screen !== "board") return;
+  if (kioskReturnTimer) window.clearTimeout(kioskReturnTimer);
+  kioskReturnTimer = window.setTimeout(showKiosk, boardIdleReturnMs);
+}
+
+function handleBoardActivity() {
+  if (state.screen === "board") scheduleKioskReturn();
+}
+
+async function runKioskAction() {
+  const member = selectedMember();
+  const action = kioskActionFor(member.id);
+  const payload = action.type === "checkout"
+    ? { action: "checkout" }
+    : {
+        workMode: "office",
+        status: "active",
+        entryMethod: "office_qr",
+        qrToken: state.scanToken || state.db.office.qrToken
+      };
+  const result = await updatePresence(payload, action.message);
+  if (result?.ok) {
+    showCompletion(member, action);
+  }
+}
+
+async function handleScanRoute() {
+  if (!state.scanToken || state.scanHandled || !state.db) return;
+  state.scanHandled = true;
+  const officeToken = state.db.office.qrToken;
+  if (state.scanToken !== officeToken) {
+    renderQrState();
+    $("#qrDialog").showModal();
+    showToast("このQRは認証できません");
+    return;
+  }
+
+  await runKioskAction();
 }
 
 function renderToday() {
@@ -606,6 +783,7 @@ function renderSettings() {
 }
 
 function render() {
+  if (!state.db) return;
   if (!memberById(selectedUserId)) {
     selectedUserId = state.db.members[0]?.id;
   }
@@ -626,13 +804,17 @@ function render() {
   renderSettings();
 }
 
+function showView(view) {
+  $$(".view").forEach((section) => section.classList.remove("is-visible"));
+  const target = $(`#${view}View`);
+  if (target) target.classList.add("is-visible");
+  $$("[data-view-button]").forEach((item) => item.classList.toggle("is-active", item.dataset.viewButton === view));
+}
+
 function bindNavigation() {
   $$("[data-view-button]").forEach((button) => {
     button.addEventListener("click", () => {
-      const view = button.dataset.viewButton;
-      $$(".view").forEach((section) => section.classList.remove("is-visible"));
-      $(`#${view}View`).classList.add("is-visible");
-      $$("[data-view-button]").forEach((item) => item.classList.toggle("is-active", item.dataset.viewButton === view));
+      showView(button.dataset.viewButton);
     });
   });
 }
@@ -642,7 +824,11 @@ function startPolling() {
   refreshTimer = window.setInterval(async () => {
     try {
       await loadState();
-      render();
+      if (state.screen === "kiosk") {
+        renderKioskScreen();
+      } else {
+        render();
+      }
     } catch (error) {
       console.warn("Failed to refresh presence state", error);
     }
@@ -650,13 +836,31 @@ function startPolling() {
 }
 
 function bindActions() {
-  $("#memberSelect").addEventListener("change", (event) => {
+  $("#kioskForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    setSelectedUser($("#kioskMemberSelect").value);
+    runKioskAction();
+  });
+
+  $("#kioskMemberSelect").addEventListener("change", (event) => {
     setSelectedUser(event.target.value);
   });
 
-  $("#mobileMemberSelect").addEventListener("change", (event) => {
-    setSelectedUser(event.target.value);
+  $("#kioskMemberList").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-kiosk-member]");
+    if (!button) return;
+    setSelectedUser(button.dataset.kioskMember);
   });
+
+  $("#memberSelect").addEventListener("change", (event) => {
+    setSelectedUser(event.target.value, { message: "操作ユーザーを切り替えました" });
+  });
+
+  $("#mobileMemberSelect").addEventListener("change", (event) => {
+    setSelectedUser(event.target.value, { message: "操作ユーザーを切り替えました" });
+  });
+
+  $("#returnKioskButton").addEventListener("click", showKiosk);
 
   $("#remoteButton").addEventListener("click", () => {
     updatePresence({
@@ -701,20 +905,28 @@ function bindActions() {
 
 async function boot() {
   state.scanToken = scanTokenFromPath();
+  state.routeMode = routeModeFromPath();
   document.addEventListener("error", handleImageError, true);
+  await Promise.all([loadState(), loadOfficeAssets()]);
+  if (!memberById(selectedUserId)) {
+    selectedUserId = state.db.members[0]?.id;
+  }
   bindNavigation();
   bindActions();
-  layoutMedia.addEventListener("change", () => {
-    if (state.db) render();
+  ["click", "keydown", "touchstart"].forEach((eventName) => {
+    window.addEventListener(eventName, handleBoardActivity, { passive: true });
   });
-  await Promise.all([loadState(), loadOfficeAssets()]);
-  render();
-  startPolling();
-
-  if (window.location.pathname.startsWith("/scan/")) {
-    renderQrState();
-    $("#qrDialog").showModal();
+  layoutMedia.addEventListener("change", () => {
+    if (!state.db) return;
+    if (state.screen === "kiosk") renderKioskScreen();
+    if (state.screen === "board" || state.screen === "viewer") render();
+  });
+  if (state.routeMode === "viewer") {
+    showViewer();
+  } else {
+    showKiosk();
   }
+  startPolling();
 }
 
 boot().catch((error) => {

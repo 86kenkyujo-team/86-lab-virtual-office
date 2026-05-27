@@ -49,7 +49,7 @@ function readBody(req) {
 }
 
 async function serveStatic(res, pathname) {
-  const routePath = pathname === "/" || pathname.startsWith("/scan/")
+  const routePath = pathname === "/" || pathname.startsWith("/scan/") || pathname.startsWith("/view") || pathname.startsWith("/presence")
     ? "/index.html"
     : decodeURIComponent(pathname);
   const safePath = path.normalize(routePath).replace(/^(\.\.[/\\])+/, "");

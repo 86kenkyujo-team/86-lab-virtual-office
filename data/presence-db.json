@@ -65,7 +65,7 @@
       "checkedInAt": "2026-05-27T09:05:00+09:00",
       "checkedOutAt": "2026-05-27T10:35:00+09:00",
       "status": "checked_out",
-      "memo": "GPS入室テスト"
+      "memo": "QR入室テスト"
     },
     {
       "id": "session-002",
@@ -75,7 +75,7 @@
       "checkedInAt": "2026-05-27T09:18:00+09:00",
       "checkedOutAt": "2026-05-27T10:42:00+09:00",
       "status": "checked_out",
-      "memo": "GPS入室テスト"
+      "memo": "QR入室テスト"
     },
     {
       "id": "session-003",
@@ -95,7 +95,7 @@
       "checkedInAt": "2026-05-27T09:45:00+09:00",
       "checkedOutAt": "2026-05-27T11:10:00+09:00",
       "status": "checked_out",
-      "memo": "GPS入室テスト"
+      "memo": "QR入室テスト"
     },
     {
       "id": "session-005",
@@ -145,7 +145,7 @@
       "type": "check_in",
       "workMode": "office",
       "createdAt": "2026-05-27T09:18:00+09:00",
-      "message": "丸林勇登さんがGPSでオフィスに入りました"
+      "message": "丸林勇登さんがQRでオフィスに入りました"
     },
     {
       "id": "event-002",

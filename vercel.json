@@ -6,6 +6,14 @@
     {
       "source": "/scan/:path*",
       "destination": "/index.html"
+    },
+    {
+      "source": "/view/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/presence/:path*",
+      "destination": "/index.html"
     }
   ]
 }

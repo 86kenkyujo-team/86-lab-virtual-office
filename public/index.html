@@ -7,7 +7,49 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <div id="app" class="app-shell">
+    <section id="kioskScreen" class="login-screen" aria-labelledby="kioskTitle">
+      <div class="login-shell">
+        <div class="login-panel">
+          <div class="brand login-brand">
+            <img src="/assets/images/brand-icon.png" alt="" class="brand__icon">
+            <div>
+              <p class="brand__eyebrow">Virtual Office</p>
+              <h1>86研究所</h1>
+            </div>
+          </div>
+          <p class="section-kicker">Entrance Terminal</p>
+          <h2 id="kioskTitle">出勤・退勤するメンバーを選択</h2>
+          <p class="login-copy" id="kioskCopy">入口タブレットで自分の名前を選ぶと、出勤または退勤を記録します。</p>
+          <form id="kioskForm" class="login-form">
+            <label for="kioskMemberSelect">メンバー</label>
+            <select id="kioskMemberSelect"></select>
+            <p class="kiosk-status" id="kioskStatus">現在の状態を確認中</p>
+            <button class="primary-button" id="kioskActionButton" type="submit">出勤する</button>
+          </form>
+          <a class="kiosk-view-link" href="/view">在籍状況ページを開く</a>
+          <div class="login-member-list" id="kioskMemberList" aria-label="メンバー候補"></div>
+        </div>
+        <aside class="login-preview" aria-label="受付後の画面プレビュー">
+          <img src="/assets/offices/86-lab-office-desktop.png" alt="86研究所の仮想オフィス画面">
+          <div class="login-preview__status">
+            <span class="mode-pill mode-pill--office">出勤受付</span>
+            <span class="mode-pill mode-pill--remote">閲覧専用</span>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="completionScreen" class="completion-screen" hidden aria-labelledby="completionTitle">
+      <div class="completion-card">
+        <img id="completionAvatar" src="/assets/avatars/taniguchi-kyoshiro.png" alt="">
+        <p class="section-kicker">Accepted</p>
+        <h2 id="completionTitle">受付が完了しました</h2>
+        <p id="completionMessage">谷口強志郎さんの出勤を記録しました。</p>
+        <span id="completionMeta" class="mode-pill mode-pill--office">オフィス勤務</span>
+      </div>
+    </section>
+
+    <div id="app" class="app-shell" hidden>
       <header class="topbar">
         <div class="brand">
           <img src="/assets/images/brand-icon.png" alt="" class="brand__icon">
@@ -29,6 +71,7 @@
             <span>操作ユーザー</span>
             <select id="memberSelect"></select>
           </label>
+          <button class="ghost-button" id="returnKioskButton" type="button">受付へ戻る</button>
         </div>
       </header>
 
@@ -222,7 +265,11 @@
                 </div>
                 <div>
                   <dt>リモート入室</dt>
-                  <dd>ログイン済みユーザーの自己申告として記録</dd>
+                  <dd>本人選択または将来の認証ユーザーの自己申告として記録</dd>
+                </div>
+                <div>
+                  <dt>入口受付</dt>
+                  <dd>入口タブレットではメンバー選択で出退勤受付</dd>
                 </div>
                 <div>
                   <dt>データ保存</dt>
